@@ -417,6 +417,7 @@
   let agentMonologue = '';
   let inVerdictPhase = false;
   let crawlComplete = false;  // Track if crawl finished
+  let crawlTimeout = null;    // Safety timeout
 
   // ── Screen Management ──
   function showScreen(name) {
@@ -426,6 +427,7 @@
   }
 
   function resetToLanding() {
+    if (crawlTimeout) { clearTimeout(crawlTimeout); crawlTimeout = null; }
     if (eventSource) { eventSource.close(); eventSource = null; }
     if (agentConversation) {
       try { agentConversation.endSession(); } catch(e) {}
@@ -484,6 +486,23 @@
 
     // 3. Start ElevenLabs Agent voice narration (best-effort — crawl works without it)
     startAgentVoice(topic);
+
+    // 4. Safety timeout — if crawl doesn't complete in 60s, force verdict screen
+    crawlTimeout = setTimeout(() => {
+      if (!crawlComplete && document.getElementById('screen-crawl').classList.contains('active')) {
+        console.warn('[Timeout] Crawl did not complete in 60s — forcing verdict');
+        addTranscriptLine('SYS', 'Crawl timed out — generating verdict from available data...', 'text-primary');
+        const fallbackData = {
+          topic: currentTopic, score: 5, mode: 'roast',
+          verdict: `The crawl timed out before completing. Based on limited data, ${currentTopic} gets a neutral 5/10.`,
+          triggers: ['Timeout', 'Limited Data'], hypeDeficiency: 0,
+          sources: [], totalResults: totalSourcesFound, elapsed: 60,
+          stats: { posHits: 0, negHits: 0, controversyHits: 0, enthusiasmHits: 0 }
+        };
+        verdictData = fallbackData;
+        showVerdictScreen(fallbackData);
+      }
+    }, 60000);
   }
 
   // ── Frontend-Driven Crawl (PRIMARY — always works) ──
@@ -675,6 +694,7 @@
 
       case 'complete':
         crawlComplete = true;
+        if (crawlTimeout) { clearTimeout(crawlTimeout); crawlTimeout = null; }
         // Use agent monologue if available, otherwise generate verdict text
         const verdictText = agentMonologue || generateVerdictText(data);
         data.verdict = verdictText;

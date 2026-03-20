@@ -54,10 +54,20 @@ app.get('/api/stream/:sessionId', (req, res) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no', // Disable Nginx/proxy buffering
   });
   res.write('data: {"type":"connected"}\n\n');
   sseClients.set(req.params.sessionId, res);
-  req.on('close', () => sseClients.delete(req.params.sessionId));
+
+  // Send keepalive pings every 15s to prevent proxy timeouts (Render, etc)
+  const keepalive = setInterval(() => {
+    try { res.write(': keepalive\n\n'); } catch(e) { clearInterval(keepalive); }
+  }, 15000);
+
+  req.on('close', () => {
+    clearInterval(keepalive);
+    sseClients.delete(req.params.sessionId);
+  });
 });
 
 function emit(sessionId, event) {
@@ -78,8 +88,15 @@ app.post('/api/start-session', (req, res) => {
 
 // ── Firecrawl Search ────────────────────────────────────────────────
 async function firecrawlSearch(query, limit = 5) {
+  if (!FIRECRAWL_API_KEY) {
+    console.error('  ❌ FIRECRAWL_API_KEY not set! Cannot search.');
+    return [];
+  }
   try {
     console.log(`  🔍 Firecrawl query: "${query}"`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000); // 20s timeout
+
     const res = await fetch('https://api.firecrawl.dev/v1/search', {
       method: 'POST',
       headers: {
@@ -91,15 +108,22 @@ async function firecrawlSearch(query, limit = 5) {
         limit,
         scrapeOptions: { formats: ['markdown'], onlyMainContent: true, timeout: 15000 },
       }),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
+
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       console.error(`  ❌ Firecrawl ${res.status}: ${errText.substring(0, 200)}`);
       return [];
     }
     const data = await res.json();
-    console.log(`  ✅ Firecrawl returned ${(data.data || []).length} results`);
-    return data.data || [];
+    const results = data.data || [];
+    console.log(`  ✅ Firecrawl returned ${results.length} results`);
+    if (results.length > 0) {
+      console.log(`     First result: "${(results[0].title || 'untitled').substring(0, 60)}"`);
+    }
+    return results;
   } catch (e) {
     console.error('  ❌ Firecrawl error:', e.message);
     return [];
@@ -338,33 +362,57 @@ app.post('/api/run-crawl', async (req, res) => {
   // Respond immediately — crawl runs async, results stream via SSE
   res.json({ ok: true, message: 'Crawl started' });
 
-  // Run phases sequentially with delays for dramatic effect
-  const phases = ['reviews', 'reddit', 'news', 'deep_dive'];
-  const phaseResults = [];
+  // Run crawl in background with full error handling
+  (async () => {
+    try {
+      const phases = ['reviews', 'reddit', 'news', 'deep_dive'];
+      const phaseResults = [];
 
-  for (const phase of phases) {
-    // Small delay between phases for visual pacing
-    await new Promise(r => setTimeout(r, 1500));
+      for (const phase of phases) {
+        // Small delay between phases for visual pacing
+        await new Promise(r => setTimeout(r, 1500));
 
-    const result = await runSearchPhase(topic, phase, sessionId);
-    if (result) {
-      phaseResults.push(result);
+        try {
+          const result = await runSearchPhase(topic, phase, sessionId);
+          if (result) {
+            phaseResults.push(result);
+            console.log(`  ✅ Phase ${phase}: ${result.count} results, sentiment: ${result.sentiment}`);
 
-      // Emit phase summary for the agent narration context
-      emit(sessionId, {
-        type: 'phase_summary',
-        phase,
-        label: result.label,
-        count: result.count,
-        sentiment: result.sentiment,
-        summaries: result.summaries,
-      });
+            // Emit phase summary for the agent narration context
+            emit(sessionId, {
+              type: 'phase_summary',
+              phase,
+              label: result.label,
+              count: result.count,
+              sentiment: result.sentiment,
+              summaries: result.summaries,
+            });
+          } else {
+            console.log(`  ⚠️ Phase ${phase}: no results (null)`);
+            emit(sessionId, { type: 'search_done', label: phase, count: 0, titles: [] });
+          }
+        } catch (phaseErr) {
+          console.error(`  ❌ Phase ${phase} crashed:`, phaseErr.message);
+          emit(sessionId, { type: 'error', message: `Phase ${phase} failed: ${phaseErr.message}` });
+        }
+      }
+
+      // Final verdict
+      await new Promise(r => setTimeout(r, 2000));
+      console.log(`  📊 Running verdict with ${(activeSession?.results || []).length} total results`);
+      runVerdict(topic, sessionId);
+    } catch (err) {
+      console.error('❌ Crawl crashed:', err);
+      emit(sessionId, { type: 'error', message: `Crawl error: ${err.message}` });
+      // Still try to deliver a verdict even on error
+      try {
+        runVerdict(topic, sessionId);
+      } catch (e) {
+        console.error('❌ Verdict also failed:', e);
+        emit(sessionId, { type: 'complete', topic, score: 5, mode: 'roast', verdict: 'Crawl failed — no data found.', triggers: ['Error'], hypeDeficiency: 0, sources: [], totalResults: 0, elapsed: 0, stats: {} });
+      }
     }
-  }
-
-  // Final verdict
-  await new Promise(r => setTimeout(r, 2000));
-  runVerdict(topic, sessionId);
+  })();
 });
 
 // ── Agent Webhook — called by ElevenLabs Conversational Agent ───────
@@ -547,6 +595,19 @@ async function updateAgentWebhookUrl() {
     console.error('❌ Webhook URL update error:', e.message);
   }
 }
+
+// ── Debug: test Firecrawl directly ──────────────────────────────────
+app.get('/api/test-crawl', async (req, res) => {
+  const query = req.query.q || 'Nike reviews 2025';
+  console.log(`🧪 Test crawl: "${query}"`);
+  const results = await firecrawlSearch(query, 2);
+  res.json({
+    query,
+    firecrawlKeySet: !!FIRECRAWL_API_KEY,
+    resultCount: results.length,
+    results: results.map(r => ({ title: r.title, url: r.url })),
+  });
+});
 
 // ── Favicon (prevent 404) ────────────────────────────────────────────
 app.get('/favicon.ico', (req, res) => res.status(204).end());
