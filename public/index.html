@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Vibe Check — Is It Fire or Trash?</title>
+  <meta name="description" content="Type any brand, product, or topic. We crawl the internet live and deliver a brutally honest roast or enthusiastic hype verdict." />
+  <meta property="og:title" content="Vibe Check — Is It Fire or Trash?" />
+  <meta property="og:description" content="AI-powered brand verdict generator. Live internet crawling + voice delivery." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
@@ -17,10 +20,12 @@
       --bg: #07070d;
       --card: rgba(255,255,255,0.03);
       --card-border: rgba(255,255,255,0.06);
+      --card-hover: rgba(255,255,255,0.05);
       --text: #f0f0f5;
       --muted: #6b6b80;
       --dim: #3a3a4a;
       --green: #22c55e;
+      --input-bg: rgba(255,255,255,0.04);
     }
 
     body {
@@ -61,14 +66,11 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
       padding: 3rem 2rem;
       gap: 1.5rem;
     }
 
-    .header {
-      text-align: center;
-    }
+    .header { text-align: center; margin-bottom: 0.5rem; }
 
     .logo {
       font-size: 4rem;
@@ -86,7 +88,74 @@
       font-weight: 400;
     }
 
+    /* ── Input Area ── */
+    .input-area {
+      width: 100%;
+      max-width: 560px;
+    }
+
+    .input-wrapper {
+      display: flex;
+      gap: 0;
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .input-wrapper:focus-within {
+      border-color: var(--fire);
+      box-shadow: 0 0 30px rgba(255, 107, 53, 0.1);
+    }
+    .input-wrapper.hype-mode:focus-within {
+      border-color: var(--hype);
+      box-shadow: 0 0 30px rgba(168, 85, 247, 0.1);
+    }
+
+    .topic-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      padding: 1.1rem 1.5rem;
+      font-family: inherit;
+      font-size: 1.1rem;
+      color: var(--text);
+      outline: none;
+    }
+    .topic-input::placeholder { color: var(--dim); }
+
+    .submit-btn {
+      padding: 1.1rem 2rem;
+      border: none;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--fire);
+      color: white;
+      transition: all 0.3s;
+      white-space: nowrap;
+    }
+    .submit-btn:hover { filter: brightness(1.15); }
+    .submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .submit-btn.hype-mode { background: var(--hype); }
+
+    .input-hint {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--dim);
+      margin-top: 0.5rem;
+    }
+
     /* ── Mode toggle ── */
+    .mode-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
     .mode-toggle {
       display: flex;
       background: var(--card);
@@ -96,11 +165,11 @@
       backdrop-filter: blur(20px);
     }
     .mode-btn {
-      padding: 0.55rem 1.8rem;
+      padding: 0.5rem 1.5rem;
       border-radius: 999px;
       border: none;
       font-family: inherit;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
@@ -110,165 +179,281 @@
     .mode-btn.active-roast {
       background: var(--fire);
       color: #fff;
-      box-shadow: 0 0 24px var(--fire-glow), inset 0 1px 0 rgba(255,255,255,0.15);
+      box-shadow: 0 0 24px var(--fire-glow);
     }
     .mode-btn.active-hype {
       background: var(--hype);
       color: #fff;
-      box-shadow: 0 0 24px var(--hype-glow), inset 0 1px 0 rgba(255,255,255,0.15);
+      box-shadow: 0 0 24px var(--hype-glow);
     }
 
-    /* ── The Orb (THE mic button) ── */
-    .orb-wrapper {
-      position: relative;
-      width: 240px;
-      height: 240px;
-      margin: 1rem 0;
+    /* ── Loading State ── */
+    .loading-state {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      width: 100%;
+      max-width: 560px;
     }
+    .loading-state.visible { display: flex; }
 
-    .orb-rings {
-      position: absolute; inset: -30px;
+    .loading-orb {
+      width: 120px;
+      height: 120px;
       border-radius: 50%;
-      border: 1px solid rgba(255, 107, 53, 0.08);
-      animation: ringPulse 4s ease-in-out infinite;
+      background: radial-gradient(circle at 38% 35%, var(--fire), #c44a20 70%, #7a2e13);
+      box-shadow: 0 0 60px rgba(255, 107, 53, 0.2);
+      animation: orbPulse 1.5s ease-in-out infinite;
     }
-    .orb-rings::after {
-      content: '';
-      position: absolute; inset: 15px;
-      border-radius: 50%;
-      border: 1px solid rgba(255, 107, 53, 0.05);
+    .loading-orb.hype {
+      background: radial-gradient(circle at 38% 35%, var(--hype), #7e3acd 70%, #4c1d95);
+      box-shadow: 0 0 60px rgba(168, 85, 247, 0.2);
     }
-    @keyframes ringPulse {
-      0%, 100% { transform: scale(1); opacity: 0.5; }
+    @keyframes orbPulse {
+      0%, 100% { transform: scale(1); opacity: 0.8; }
       50% { transform: scale(1.08); opacity: 1; }
     }
 
-    .orb {
+    .loading-text {
+      font-size: 1rem;
+      color: var(--muted);
+      font-weight: 500;
+      text-align: center;
+    }
+    .loading-phase {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      color: var(--fire);
+    }
+    .loading-phase.hype { color: var(--hype); }
+
+    /* ── Verdict Card ── */
+    .verdict-card {
+      display: none;
       width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      cursor: pointer;
+      max-width: 560px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 2rem;
+      backdrop-filter: blur(20px);
+      animation: cardIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .verdict-card.visible { display: block; }
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(20px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .verdict-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+    }
+    .verdict-topic {
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+    .verdict-badge {
+      padding: 0.35rem 1rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .verdict-badge.roast { background: var(--fire); color: white; }
+    .verdict-badge.hype { background: var(--hype); color: white; }
+
+    /* Score gauge */
+    .score-section {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .score-ring {
       position: relative;
-      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.4s;
-      background: radial-gradient(circle at 38% 35%, var(--fire), #c44a20 70%, #7a2e13);
-      box-shadow:
-        0 0 60px rgba(255, 107, 53, 0.15),
-        inset 0 -8px 30px rgba(0,0,0,0.4),
-        inset 0 6px 20px rgba(255,255,255,0.08);
+      width: 100px;
+      height: 100px;
+      flex-shrink: 0;
     }
-    .orb::after {
-      content: '';
-      position: absolute;
-      top: 18%; left: 25%;
-      width: 30%; height: 20%;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.12);
-      filter: blur(12px);
+    .score-ring svg {
+      transform: rotate(-90deg);
+      width: 100px;
+      height: 100px;
     }
-
-    .orb:hover {
-      transform: scale(1.06);
-      box-shadow:
-        0 0 80px rgba(255, 107, 53, 0.3),
-        inset 0 -8px 30px rgba(0,0,0,0.4),
-        inset 0 6px 20px rgba(255,255,255,0.1);
+    .score-ring .bg-ring {
+      fill: none;
+      stroke: var(--card-border);
+      stroke-width: 6;
     }
-
-    .orb.hype-mode {
-      background: radial-gradient(circle at 38% 35%, var(--hype), #7e3acd 70%, #4c1d95);
+    .score-ring .fg-ring {
+      fill: none;
+      stroke-width: 6;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .orb.hype-mode:hover {
-      box-shadow:
-        0 0 80px rgba(168, 85, 247, 0.3),
-        inset 0 -8px 30px rgba(0,0,0,0.4),
-        inset 0 6px 20px rgba(255,255,255,0.1);
-    }
-
-    /* Orb mic icon */
-    .orb-icon {
+    .score-number {
       position: absolute;
       inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 3.5rem;
-      z-index: 2;
-      opacity: 0.9;
-      transition: opacity 0.3s;
-      user-select: none;
+      font-size: 2rem;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
     }
-
-    /* Orb states */
-    .orb.listening {
-      animation: orbListen 1.5s ease-in-out infinite;
-    }
-    @keyframes orbListen {
-      0%, 100% { box-shadow: 0 0 40px rgba(255,107,53,0.2), inset 0 -8px 30px rgba(0,0,0,0.4); }
-      50% { box-shadow: 0 0 100px rgba(255,107,53,0.5), inset 0 -8px 30px rgba(0,0,0,0.4); }
-    }
-
-    .orb.speaking {
-      animation: orbSpeak 0.6s ease-in-out infinite alternate;
-    }
-    @keyframes orbSpeak {
-      0% { transform: scale(1); box-shadow: 0 0 50px rgba(168,85,247,0.3); }
-      100% { transform: scale(1.07); box-shadow: 0 0 100px rgba(255,107,53,0.5); }
-    }
-
-    .orb-status {
-      text-align: center;
-      font-size: 0.85rem;
-      color: var(--muted);
-      font-weight: 500;
-      height: 1.2rem;
-      transition: color 0.3s;
-    }
-    .orb-status.active { color: var(--fire); }
-    .orb-status.connected { color: var(--green); }
-
-    /* ── Transcript ── */
-    .transcript-section {
-      width: 100%;
-      max-width: 520px;
-    }
-    .section-label {
-      font-size: 0.7rem;
+    .score-label {
+      font-size: 0.65rem;
       text-transform: uppercase;
-      letter-spacing: 0.12em;
+      letter-spacing: 0.1em;
       color: var(--dim);
-      margin-bottom: 0.5rem;
-      font-weight: 600;
+      text-align: center;
+      margin-top: -0.5rem;
     }
-    .transcript-box {
-      background: var(--card);
-      border: 1px solid var(--card-border);
-      border-radius: 16px;
-      padding: 1.25rem;
-      min-height: 100px;
-      max-height: 220px;
-      overflow-y: auto;
-      backdrop-filter: blur(20px);
-      scrollbar-width: thin;
-      scrollbar-color: var(--dim) transparent;
-    }
-    .transcript-line {
-      margin-bottom: 0.4rem;
+    .score-desc {
+      font-size: 0.95rem;
+      color: var(--muted);
       line-height: 1.5;
-      font-size: 0.9rem;
-      animation: fadeInUp 0.3s ease;
     }
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
+
+    /* Verdict text */
+    .verdict-text {
+      font-size: 0.95rem;
+      line-height: 1.7;
+      color: var(--text);
+      margin-bottom: 1.5rem;
+      padding: 1rem;
+      background: rgba(255,255,255,0.02);
+      border-radius: 12px;
+      border-left: 3px solid var(--fire);
     }
-    .speaker { font-weight: 600; }
-    .speaker.user { color: var(--fire); }
-    .speaker.agent { color: var(--hype); }
-    .empty-state {
-      color: var(--dim);
-      font-style: italic;
+    .verdict-text.hype { border-left-color: var(--hype); }
+
+    /* Audio player */
+    .audio-section {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .play-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: none;
+      background: var(--fire);
+      color: white;
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s;
+      flex-shrink: 0;
+    }
+    .play-btn:hover { transform: scale(1.1); filter: brightness(1.15); }
+    .play-btn.hype { background: var(--hype); }
+    .play-btn.playing { animation: speakPulse 0.6s ease-in-out infinite alternate; }
+    @keyframes speakPulse {
+      from { box-shadow: 0 0 10px var(--fire-glow); }
+      to { box-shadow: 0 0 30px var(--fire-glow); }
+    }
+    .audio-label {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    .audio-bar {
+      flex: 1;
+      height: 4px;
+      background: var(--card-border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .audio-progress {
+      height: 100%;
+      width: 0%;
+      background: var(--fire);
+      border-radius: 2px;
+      transition: width 0.1s linear;
+    }
+    .audio-progress.hype { background: var(--hype); }
+
+    /* Actions */
+    .verdict-actions {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .action-btn {
+      padding: 0.65rem 1.3rem;
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+      background: var(--card);
+      color: var(--text);
+      font-family: inherit;
       font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
+    .action-btn:hover {
+      background: var(--card-hover);
+      border-color: rgba(255,255,255,0.12);
+    }
+    .action-btn.primary {
+      background: #1DA1F2;
+      border-color: #1DA1F2;
+      color: white;
+    }
+    .action-btn.primary:hover { filter: brightness(1.15); }
+    .action-btn.new-check {
+      border-color: var(--fire);
+      color: var(--fire);
+    }
+
+    /* Sources */
+    .sources-section {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--card-border);
+    }
+    .sources-toggle {
+      font-size: 0.75rem;
+      color: var(--dim);
+      cursor: pointer;
+      font-family: inherit;
+      background: none;
+      border: none;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .sources-toggle:hover { color: var(--muted); }
+    .sources-list {
+      display: none;
+      margin-top: 0.5rem;
+      gap: 0.3rem;
+      flex-direction: column;
+    }
+    .sources-list.visible { display: flex; }
+    .source-link {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-decoration: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      padding-left: 0.5rem;
+      border-left: 2px solid var(--card-border);
+    }
+    .source-link:hover { color: var(--fire); }
 
     /* ── Right: Activity panel ── */
     .activity-panel {
@@ -352,6 +537,7 @@
     .act-label.found { color: var(--green); }
     .act-label.brand { color: var(--hype); }
     .act-label.error { color: #ef4444; }
+    .act-label.status { color: #60a5fa; }
 
     .act-query {
       font-family: 'JetBrains Mono', monospace;
@@ -396,10 +582,7 @@
       padding: 2rem;
       gap: 0.75rem;
     }
-    .activity-empty .empty-icon {
-      font-size: 2rem;
-      opacity: 0.3;
-    }
+    .activity-empty .empty-icon { font-size: 2rem; opacity: 0.3; }
 
     /* ── How it works ── */
     .how-section {
@@ -457,9 +640,7 @@
 
     /* ── Responsive ── */
     @media (max-width: 860px) {
-      .app {
-        grid-template-columns: 1fr;
-      }
+      .app { grid-template-columns: 1fr; }
       .activity-panel {
         border-left: none;
         border-top: 1px solid var(--card-border);
@@ -468,8 +649,7 @@
         position: relative;
       }
       .logo { font-size: 3rem; }
-      .orb-wrapper { width: 180px; height: 180px; }
-      .orb-icon { font-size: 2.5rem; }
+      .stage { padding: 2rem 1rem; }
     }
   </style>
 </head>
@@ -484,28 +664,87 @@
         <div class="logo">
           <span class="fire">VIBE</span> <span class="purple">CHECK</span>
         </div>
-        <p class="tagline">Say a brand. Get the truth.</p>
+        <p class="tagline">Type anything. We crawl the internet. You get the truth.</p>
       </div>
 
-      <div class="mode-toggle">
-        <button class="mode-btn active-roast" id="btn-roast" onclick="setMode('roast')">🔥 Roast</button>
-        <button class="mode-btn" id="btn-hype" onclick="setMode('hype')">🚀 Hype</button>
-      </div>
-
-      <div class="orb-wrapper">
-        <div class="orb-rings"></div>
-        <div class="orb" id="orb" onclick="toggleConversation()">
-          <div class="orb-icon" id="orb-icon">🎤</div>
+      <div class="mode-row">
+        <div class="mode-toggle">
+          <button class="mode-btn active-roast" id="btn-roast" onclick="setMode('roast')">🔥 Roast</button>
+          <button class="mode-btn" id="btn-hype" onclick="setMode('hype')">🚀 Hype</button>
         </div>
       </div>
-      <div class="orb-status" id="orb-status">Tap to start</div>
 
-      <div class="transcript-section">
-        <div class="section-label">Live Transcript</div>
-        <div class="transcript-box" id="transcript-box">
-          <div id="transcript">
-            <p class="empty-state">Say a brand name and hear the verdict...</p>
+      <div class="input-area" id="input-area">
+        <div class="input-wrapper" id="input-wrapper">
+          <input
+            type="text"
+            class="topic-input"
+            id="topic-input"
+            placeholder="Enter a brand, product, site, or topic..."
+            autocomplete="off"
+            autofocus
+          />
+          <button class="submit-btn" id="submit-btn" onclick="startVibeCheck()">
+            VIBE CHECK
+          </button>
+        </div>
+        <p class="input-hint">Try: Tesla, TikTok, Crumbl Cookies, Reddit, your startup...</p>
+      </div>
+
+      <!-- Loading state -->
+      <div class="loading-state" id="loading-state">
+        <div class="loading-orb" id="loading-orb"></div>
+        <div class="loading-text" id="loading-text">Crawling the internet...</div>
+        <div class="loading-phase" id="loading-phase">Starting search...</div>
+      </div>
+
+      <!-- Verdict card -->
+      <div class="verdict-card" id="verdict-card">
+        <div class="verdict-header">
+          <span class="verdict-topic" id="verdict-topic"></span>
+          <span class="verdict-badge" id="verdict-badge"></span>
+        </div>
+
+        <div class="score-section">
+          <div class="score-ring">
+            <svg viewBox="0 0 100 100">
+              <circle class="bg-ring" cx="50" cy="50" r="42" />
+              <circle class="fg-ring" id="score-fg" cx="50" cy="50" r="42"
+                stroke-dasharray="264" stroke-dashoffset="264" />
+            </svg>
+            <div class="score-number" id="score-number">0</div>
           </div>
+          <div>
+            <div class="score-label">VIBE SCORE</div>
+            <p class="score-desc" id="score-desc"></p>
+          </div>
+        </div>
+
+        <div class="verdict-text" id="verdict-text"></div>
+
+        <div class="audio-section" id="audio-section">
+          <button class="play-btn" id="play-btn" onclick="toggleAudio()">▶</button>
+          <div style="flex:1">
+            <div class="audio-label">Listen to the verdict</div>
+            <div class="audio-bar">
+              <div class="audio-progress" id="audio-progress"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="verdict-actions">
+          <button class="action-btn primary" id="share-x-btn" onclick="shareOnX()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            Share on X
+          </button>
+          <button class="action-btn new-check" onclick="resetForNewCheck()">
+            ↻ New Vibe Check
+          </button>
+        </div>
+
+        <div class="sources-section">
+          <button class="sources-toggle" onclick="toggleSources()">▸ Sources (<span id="source-count">0</span>)</button>
+          <div class="sources-list" id="sources-list"></div>
         </div>
       </div>
     </div>
@@ -515,24 +754,24 @@
       <div class="panel-header">
         <div class="panel-title">
           <span class="dot" id="sse-dot"></span>
-          Firecrawl Activity
+          Live Crawl Activity
         </div>
       </div>
 
       <div class="activity-feed" id="activity-feed">
         <div class="activity-empty" id="activity-empty">
           <div class="empty-icon">🔍</div>
-          <div>Waiting for a search...<br/>Say a brand name to see live results</div>
+          <div>Waiting for a search...<br/>Type a topic to see live results</div>
         </div>
       </div>
 
       <div class="how-section">
-        <div class="section-label">How It Works</div>
+        <div class="section-label" style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--dim);font-weight:600;">How It Works</div>
         <div class="how-grid">
           <div class="how-step">
             <div class="step-num">01</div>
-            <div class="step-icon">🎤</div>
-            <div class="step-text">Say any brand</div>
+            <div class="step-icon">⌨️</div>
+            <div class="step-text">Type any topic</div>
           </div>
           <div class="how-step">
             <div class="step-num">02</div>
@@ -542,12 +781,12 @@
           <div class="how-step">
             <div class="step-num">03</div>
             <div class="step-icon">🧠</div>
-            <div class="step-text">AI crafts a monologue</div>
+            <div class="step-text">AI crafts a verdict</div>
           </div>
           <div class="how-step">
             <div class="step-num">04</div>
-            <div class="step-icon">🔊</div>
-            <div class="step-text">Hear the verdict</div>
+            <div class="step-icon">📢</div>
+            <div class="step-text">Hear & share the score</div>
           </div>
         </div>
       </div>
@@ -560,234 +799,283 @@
     </div>
   </div>
 
-  <!-- ElevenLabs Conversational AI SDK (full control, no widget bubble) -->
-  <script type="module">
-    import { Conversation } from 'https://cdn.jsdelivr.net/npm/@11labs/client@latest/+esm';
-
-    const AGENT_ID = 'agent_9901km4fzxnqehd9yftccq7wnjbq';
-
-    let conversation = null;
+  <script>
     let currentMode = 'roast';
-    let isConnected = false;
+    let audioElement = null;
+    let currentResult = null;
+    let sessionId = null;
+    let eventSource = null;
 
     // ── Mode toggle ──
     window.setMode = function(mode) {
       currentMode = mode;
       const roastBtn = document.getElementById('btn-roast');
       const hypeBtn = document.getElementById('btn-hype');
-      const orb = document.getElementById('orb');
+      const wrapper = document.getElementById('input-wrapper');
+      const submitBtn = document.getElementById('submit-btn');
 
       roastBtn.className = mode === 'roast' ? 'mode-btn active-roast' : 'mode-btn';
       hypeBtn.className = mode === 'hype' ? 'mode-btn active-hype' : 'mode-btn';
 
       if (mode === 'hype') {
-        orb.classList.add('hype-mode');
+        wrapper.classList.add('hype-mode');
+        submitBtn.classList.add('hype-mode');
       } else {
-        orb.classList.remove('hype-mode');
+        wrapper.classList.remove('hype-mode');
+        submitBtn.classList.remove('hype-mode');
       }
     };
 
-    // ── Toggle conversation on orb click ──
-    window.toggleConversation = async function() {
-      if (isConnected && conversation) {
-        await conversation.endSession();
-        onDisconnected();
-        return;
+    // ── Enter key handler ──
+    document.getElementById('topic-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        startVibeCheck();
       }
-      await startConversation();
-    };
+    });
 
-    async function startConversation() {
-      const orb = document.getElementById('orb');
-      const status = document.getElementById('orb-status');
-      const icon = document.getElementById('orb-icon');
+    // ── Start Vibe Check ──
+    window.startVibeCheck = async function() {
+      const input = document.getElementById('topic-input');
+      const topic = input.value.trim();
+      if (!topic) return;
 
-      status.textContent = 'Connecting...';
-      status.className = 'orb-status active';
-      icon.textContent = '⏳';
+      const submitBtn = document.getElementById('submit-btn');
+      submitBtn.disabled = true;
+
+      // Generate session ID
+      sessionId = crypto.randomUUID();
+
+      // Switch to loading state
+      document.getElementById('input-area').style.display = 'none';
+      document.getElementById('verdict-card').classList.remove('visible');
+      const loading = document.getElementById('loading-state');
+      loading.classList.add('visible');
+
+      const loadingOrb = document.getElementById('loading-orb');
+      const loadingPhase = document.getElementById('loading-phase');
+      loadingOrb.className = currentMode === 'hype' ? 'loading-orb hype' : 'loading-orb';
+      loadingPhase.className = currentMode === 'hype' ? 'loading-phase hype' : 'loading-phase';
+
+      // Clear activity feed
+      const feed = document.getElementById('activity-feed');
+      const empty = document.getElementById('activity-empty');
+      feed.innerHTML = '';
+      if (empty) feed.appendChild(empty);
+      if (empty) empty.style.display = 'none';
+
+      // Connect SSE
+      connectSSE(sessionId);
 
       try {
-        // Request microphone permission
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-
-        // Get signed URL from our backend
-        const urlRes = await fetch(`/api/signed-url?agent_id=${AGENT_ID}`);
-        const urlData = await urlRes.json();
-
-        if (!urlData.signed_url) {
-          throw new Error('Failed to get signed URL');
-        }
-
-        conversation = await Conversation.startSession({
-          signedUrl: urlData.signed_url,
-          onConnect: () => {
-            isConnected = true;
-            orb.classList.add('listening');
-            orb.classList.remove('speaking');
-            status.textContent = '🎤 Listening — say a brand name!';
-            status.className = 'orb-status connected';
-            icon.textContent = '🎤';
-
-            // Clear empty state in transcript
-            const transcript = document.getElementById('transcript');
-            if (transcript.querySelector('.empty-state')) {
-              transcript.innerHTML = '';
-            }
-          },
-          onDisconnect: () => {
-            onDisconnected();
-          },
-          onError: (error) => {
-            console.error('Conversation error:', error);
-            status.textContent = 'Error — tap to retry';
-            status.className = 'orb-status';
-            icon.textContent = '🎤';
-            isConnected = false;
-          },
-          onModeChange: ({ mode }) => {
-            if (mode === 'speaking') {
-              orb.classList.add('speaking');
-              orb.classList.remove('listening');
-              icon.textContent = '🔊';
-              status.textContent = 'Speaking...';
-            } else if (mode === 'listening') {
-              orb.classList.add('listening');
-              orb.classList.remove('speaking');
-              icon.textContent = '🎤';
-              status.textContent = '🎤 Listening...';
-            } else {
-              orb.classList.remove('speaking', 'listening');
-              icon.textContent = '🎤';
-            }
-          },
-          onMessage: ({ message, source }) => {
-            addTranscriptLine(source === 'user' ? 'You' : 'Vibe Check', message, source);
-          },
+        const res = await fetch('/api/vibe-check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic, mode: currentMode, sessionId }),
         });
+
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+
+        const data = await res.json();
+        currentResult = data;
+        showVerdict(data);
       } catch (err) {
-        console.error('Failed to start:', err);
-        status.textContent = err.name === 'NotAllowedError'
-          ? 'Mic access denied — check permissions'
-          : 'Connection failed — tap to retry';
-        status.className = 'orb-status';
-        icon.textContent = '🎤';
-        isConnected = false;
+        console.error('Vibe Check failed:', err);
+        document.getElementById('loading-text').textContent = 'Something went wrong!';
+        loadingPhase.textContent = err.message;
+        setTimeout(() => resetForNewCheck(), 3000);
+      } finally {
+        submitBtn.disabled = false;
+        if (eventSource) { eventSource.close(); eventSource = null; }
       }
-    }
+    };
 
-    function onDisconnected() {
-      const orb = document.getElementById('orb');
-      const status = document.getElementById('orb-status');
-      const icon = document.getElementById('orb-icon');
-
-      orb.classList.remove('speaking', 'listening');
-      status.textContent = 'Tap to start';
-      status.className = 'orb-status';
-      icon.textContent = '🎤';
-      isConnected = false;
-      conversation = null;
-    }
-
-    function addTranscriptLine(speaker, text, type) {
-      const transcript = document.getElementById('transcript');
-      const box = document.getElementById('transcript-box');
-      const div = document.createElement('div');
-      div.className = 'transcript-line';
-      div.innerHTML = `<span class="speaker ${type}">${speaker}:</span> ${text}`;
-      transcript.appendChild(div);
-      box.scrollTop = box.scrollHeight;
-    }
-
-    // ── SSE: Live Firecrawl activity ──
-    function connectSSE() {
-      const feed = document.getElementById('activity-feed');
+    // ── Connect SSE for live activity ──
+    function connectSSE(sid) {
+      if (eventSource) eventSource.close();
+      eventSource = new EventSource(`/api/activity/${sid}`);
       const dot = document.getElementById('sse-dot');
-      const emptyState = document.getElementById('activity-empty');
 
-      const es = new EventSource('/api/activity');
-
-      es.onmessage = (event) => {
+      eventSource.onmessage = (event) => {
         const data = JSON.parse(event.data);
+        if (data.type === 'connected') { dot.classList.add('live'); return; }
 
-        if (data.type === 'connected') {
-          dot.classList.add('live');
-          return;
+        const emptyEl = document.getElementById('activity-empty');
+        if (emptyEl) emptyEl.style.display = 'none';
+
+        // Update loading phase text
+        if (data.type === 'status') {
+          document.getElementById('loading-text').textContent = data.message;
+          document.getElementById('loading-phase').textContent = data.phase === 'crawl' ? 'Firecrawl searching...' : data.phase === 'analyze' ? 'Crunching sentiment...' : data.phase === 'speech' ? 'ElevenLabs generating voice...' : '✓';
         }
 
-        // Hide empty state on first real event
-        if (emptyState) emptyState.style.display = 'none';
-
+        const feed = document.getElementById('activity-feed');
         const item = document.createElement('div');
         item.className = 'activity-item';
         const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-        if (data.type === 'brand_start') {
-          item.innerHTML = `
-            <div class="act-header">
-              <span class="act-icon">🎯</span>
-              <span class="act-label brand">Vibe Checking</span>
-            </div>
-            <div class="act-query">"${data.brand}"</div>
-            <div class="act-time">${now}</div>
-          `;
+        if (data.type === 'crawl_start') {
+          item.innerHTML = `<div class="act-header"><span class="act-icon">🎯</span><span class="act-label brand">Vibe Checking</span></div><div class="act-query">"${data.topic}"</div><div class="act-time">${now}</div>`;
         } else if (data.type === 'search_start') {
-          item.innerHTML = `
-            <div class="act-header">
-              <span class="act-icon"><span class="spinner"></span></span>
-              <span class="act-label searching">${data.label || 'Searching'}</span>
-            </div>
-            <div class="act-query">${data.query}</div>
-            <div class="act-time">${now}</div>
-          `;
+          item.innerHTML = `<div class="act-header"><span class="act-icon"><span class="spinner"></span></span><span class="act-label searching">${data.label || 'Searching'}</span></div><div class="act-query">${data.query}</div><div class="act-time">${now}</div>`;
         } else if (data.type === 'search_done') {
-          item.innerHTML = `
-            <div class="act-header">
-              <span class="act-icon">✅</span>
-              <span class="act-label found">${data.label || 'Found'} — ${data.count} results</span>
-            </div>
-            <div class="act-query">${data.query}</div>
-            ${data.titles?.length ? `
-              <div class="act-results">
-                ${data.titles.map(t => `<div class="act-result-title">• ${t}</div>`).join('')}
-              </div>
-            ` : ''}
-            <div class="act-time">${now}</div>
-          `;
+          item.innerHTML = `<div class="act-header"><span class="act-icon">✅</span><span class="act-label found">${data.label || 'Found'} — ${data.count} results</span></div><div class="act-query">${data.query}</div>${data.titles?.length ? `<div class="act-results">${data.titles.map(t => `<div class="act-result-title">• ${t}</div>`).join('')}</div>` : ''}<div class="act-time">${now}</div>`;
         } else if (data.type === 'search_error') {
-          item.innerHTML = `
-            <div class="act-header">
-              <span class="act-icon">❌</span>
-              <span class="act-label error">Error</span>
-            </div>
-            <div class="act-query">${data.query}: ${data.error}</div>
-            <div class="act-time">${now}</div>
-          `;
-        } else if (data.type === 'brand_done') {
-          item.innerHTML = `
-            <div class="act-header">
-              <span class="act-icon">🏁</span>
-              <span class="act-label found">Done — ${data.totalResults} total results</span>
-            </div>
-            <div class="act-query">${(data.contextLength / 1000).toFixed(1)}KB of context sent to AI</div>
-            <div class="act-time">${now}</div>
-          `;
-        } else {
-          return; // Unknown event, skip
-        }
+          item.innerHTML = `<div class="act-header"><span class="act-icon">❌</span><span class="act-label error">Error</span></div><div class="act-query">${data.query}: ${data.error}</div><div class="act-time">${now}</div>`;
+        } else if (data.type === 'crawl_done') {
+          item.innerHTML = `<div class="act-header"><span class="act-icon">🏁</span><span class="act-label found">Crawl Complete — ${data.totalResults} results</span></div><div class="act-time">${now}</div>`;
+        } else if (data.type === 'status') {
+          item.innerHTML = `<div class="act-header"><span class="act-icon">⚡</span><span class="act-label status">${data.message}</span></div><div class="act-time">${now}</div>`;
+        } else return;
 
         feed.appendChild(item);
         feed.scrollTop = feed.scrollHeight;
       };
 
-      es.onerror = () => {
-        dot.classList.remove('live');
-        // Auto-reconnect after 3 seconds
-        setTimeout(connectSSE, 3000);
-      };
+      eventSource.onerror = () => { dot.classList.remove('live'); };
     }
 
-    // Start SSE on load
-    connectSSE();
+    // ── Show Verdict ──
+    function showVerdict(data) {
+      const loading = document.getElementById('loading-state');
+      loading.classList.remove('visible');
+
+      const card = document.getElementById('verdict-card');
+      card.classList.add('visible');
+
+      // Header
+      document.getElementById('verdict-topic').textContent = data.topic;
+      const badge = document.getElementById('verdict-badge');
+      badge.textContent = data.mode === 'roast' ? '🔥 ROAST' : '🚀 HYPE';
+      badge.className = `verdict-badge ${data.mode}`;
+
+      // Score ring
+      const circumference = 2 * Math.PI * 42; // ~264
+      const offset = circumference - (data.score / 10) * circumference;
+      const fg = document.getElementById('score-fg');
+      fg.style.stroke = data.mode === 'roast' ? 'var(--fire)' : 'var(--hype)';
+      setTimeout(() => { fg.style.strokeDashoffset = offset; }, 100);
+
+      const scoreNum = document.getElementById('score-number');
+      scoreNum.style.color = data.mode === 'roast' ? 'var(--fire)' : 'var(--hype)';
+      animateNumber(scoreNum, data.score);
+
+      // Score description
+      const descs = {
+        roast: { 1: 'Absolute dumpster fire', 2: 'Yikes on bikes', 3: 'Not great, Bob', 4: 'Below average vibes', 5: 'Aggressively mid', 6: 'Could be worse...', 7: 'Surprisingly decent', 8: 'Respect earned', 9: 'Hard to roast', 10: 'Immune to criticism' },
+        hype: { 1: 'Needs CPR', 2: 'Struggling but trying', 3: 'Some potential there', 4: 'Building momentum', 5: 'Solid foundation', 6: 'Getting interesting', 7: 'Real heat here', 8: 'On fire', 9: 'Absolutely elite', 10: 'LEGENDARY status' }
+      };
+      document.getElementById('score-desc').textContent = descs[data.mode][data.score] || 'Vibes assessed';
+
+      // Verdict text
+      const vt = document.getElementById('verdict-text');
+      vt.textContent = data.verdict;
+      vt.className = `verdict-text ${data.mode === 'hype' ? 'hype' : ''}`;
+
+      // Audio
+      if (data.audio) {
+        document.getElementById('audio-section').style.display = 'flex';
+        const playBtn = document.getElementById('play-btn');
+        playBtn.className = `play-btn ${data.mode === 'hype' ? 'hype' : ''}`;
+        const prog = document.getElementById('audio-progress');
+        prog.className = `audio-progress ${data.mode === 'hype' ? 'hype' : ''}`;
+
+        audioElement = new Audio(`data:audio/mpeg;base64,${data.audio}`);
+        audioElement.addEventListener('timeupdate', () => {
+          if (audioElement.duration) {
+            prog.style.width = `${(audioElement.currentTime / audioElement.duration) * 100}%`;
+          }
+        });
+        audioElement.addEventListener('ended', () => {
+          playBtn.textContent = '▶';
+          playBtn.classList.remove('playing');
+        });
+
+        // Auto-play
+        audioElement.play().then(() => {
+          playBtn.textContent = '⏸';
+          playBtn.classList.add('playing');
+        }).catch(() => {});
+      } else {
+        document.getElementById('audio-section').style.display = 'none';
+      }
+
+      // Sources
+      if (data.sources?.length) {
+        document.getElementById('source-count').textContent = data.sources.length;
+        const list = document.getElementById('sources-list');
+        list.innerHTML = data.sources.map(s =>
+          `<a class="source-link" href="${s.url}" target="_blank" rel="noopener">${s.title || s.url}</a>`
+        ).join('');
+      }
+    }
+
+    function animateNumber(el, target) {
+      let current = 0;
+      const step = () => {
+        current++;
+        el.textContent = current;
+        if (current < target) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }
+
+    // ── Toggle Audio ──
+    window.toggleAudio = function() {
+      if (!audioElement) return;
+      const btn = document.getElementById('play-btn');
+      if (audioElement.paused) {
+        audioElement.play();
+        btn.textContent = '⏸';
+        btn.classList.add('playing');
+      } else {
+        audioElement.pause();
+        btn.textContent = '▶';
+        btn.classList.remove('playing');
+      }
+    };
+
+    // ── Share on X ──
+    window.shareOnX = function() {
+      if (!currentResult) return;
+      const { topic, score, mode } = currentResult;
+      const emoji = mode === 'roast' ? '🔥' : '🚀';
+      const label = mode === 'roast' ? 'Roast' : 'Hype';
+      const text = `${emoji} ${topic} got a ${score}/10 ${label} Score on Vibe Check!\n\nAI crawled the internet and delivered the verdict.\n\nCheck your brand's vibe 👇`;
+      const url = window.location.origin;
+      const shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+      window.open(shareUrl, '_blank', 'width=600,height=400');
+    };
+
+    // ── Toggle Sources ──
+    window.toggleSources = function() {
+      const list = document.getElementById('sources-list');
+      const toggle = document.querySelector('.sources-toggle');
+      if (list.classList.contains('visible')) {
+        list.classList.remove('visible');
+        toggle.textContent = `▸ Sources (${document.getElementById('source-count').textContent})`;
+      } else {
+        list.classList.add('visible');
+        toggle.textContent = `▾ Sources (${document.getElementById('source-count').textContent})`;
+      }
+    };
+
+    // ── Reset ──
+    window.resetForNewCheck = function() {
+      document.getElementById('loading-state').classList.remove('visible');
+      document.getElementById('verdict-card').classList.remove('visible');
+      document.getElementById('input-area').style.display = 'block';
+      document.getElementById('topic-input').value = '';
+      document.getElementById('topic-input').focus();
+
+      // Reset score ring
+      document.getElementById('score-fg').style.strokeDashoffset = '264';
+      document.getElementById('score-number').textContent = '0';
+      document.getElementById('audio-progress').style.width = '0%';
+
+      if (audioElement) { audioElement.pause(); audioElement = null; }
+      currentResult = null;
+    };
   </script>
 </body>
 </html>
