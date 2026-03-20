@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: vibe-check
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: FIRECRAWL_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: PORT
+        value: 3000
+      - key: SERVER_URL
+        sync: false

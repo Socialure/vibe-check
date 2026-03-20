@@ -24,31 +24,32 @@ async function createTool() {
     method: 'POST',
     headers,
     body: JSON.stringify({
-      type: 'webhook',
       name: 'vibe_check_search',
       description: 'Search the internet for the latest buzz, reviews, opinions, and news about a brand or product. Call this whenever the user mentions a brand, product, or company they want a vibe check on.',
-      api_schema: {
-        url: `${SERVER_URL}/api/vibe-check`,
-        method: 'POST',
-        content_type: 'application/json',
-        request_body_schema: {
-          type: 'object',
-          properties: {
-            brand: {
-              type: 'string',
-              description: 'The brand, product, or company name to search for'
+      tool_config: {
+        type: 'webhook',
+        api_schema: {
+          url: `${SERVER_URL}/api/vibe-check`,
+          method: 'POST',
+          content_type: 'application/json',
+          request_body_schema: {
+            type: 'object',
+            properties: {
+              brand: {
+                type: 'string',
+                description: 'The brand, product, or company name to search for'
+              },
+              mode: {
+                type: 'string',
+                description: 'The vibe check mode: "roast" for brutal/funny critique, or "hype" for enthusiastic praise. Default to "roast" unless the user specifically asks for hype.',
+                enum: ['roast', 'hype']
+              }
             },
-            mode: {
-              type: 'string',
-              description: 'The vibe check mode: "roast" for brutal/funny critique, or "hype" for enthusiastic praise. Default to "roast" unless the user specifically asks for hype.',
-              enum: ['roast', 'hype']
-            }
-          },
-          required: ['brand', 'mode']
-        }
-      },
-      response_timeout_secs: 30,
-      execution_mode: 'immediate'
+            required: ['brand', 'mode']
+          }
+        },
+        response_timeout_secs: 30
+      }
     })
   });
 
