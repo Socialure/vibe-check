@@ -397,14 +397,14 @@
 
 <!-- JAVASCRIPT — ElevenLabs Agent Integration -->
 <script type="module">
-  // ── Import ElevenLabs Client SDK ──
+  // ── Import ElevenLabs Client SDK (correct package + version) ──
   let Conversation;
   try {
-    const mod = await import('https://esm.sh/@11labs/client@0.3.0');
+    const mod = await import('https://esm.sh/@elevenlabs/client@0.15.2');
     Conversation = mod.Conversation;
-    console.log('[Agent] ElevenLabs SDK loaded ✅');
+    console.log('[Agent] ElevenLabs SDK v0.15.2 loaded ✅');
   } catch (e) {
-    console.warn('[Agent] SDK load failed, will retry on start:', e.message);
+    console.error('[Agent] SDK load FAILED:', e.message);
   }
 
   let sessionId = null;
@@ -491,20 +491,32 @@
     try {
       // Lazy-load SDK if first load failed
       if (!Conversation) {
-        const mod = await import('https://esm.sh/@11labs/client@0.3.0');
+        const mod = await import('https://esm.sh/@elevenlabs/client@0.15.2');
         Conversation = mod.Conversation;
+        if (!Conversation) throw new Error('SDK loaded but Conversation class not found');
       }
 
       // Get signed URL from our server (keeps API key server-side)
+      addTranscriptLine('SYS', 'Requesting agent connection...', 'text-on-surface-variant');
       const urlRes = await fetch('/api/signed-url');
-      if (!urlRes.ok) throw new Error(`Signed URL failed: ${urlRes.status}`);
+      if (!urlRes.ok) {
+        const errBody = await urlRes.text().catch(() => '');
+        throw new Error(`Signed URL failed (${urlRes.status}): ${errBody}`);
+      }
       const { signed_url } = await urlRes.json();
+      if (!signed_url) throw new Error('No signed_url in response');
 
-      // Request mic permission upfront (required by SDK for WebSocket audio)
-      // The agent will talk; user doesn't need to speak
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Request mic permission (required by SDK for WebRTC audio — agent talks, user listens)
+      addTranscriptLine('SYS', 'Requesting microphone access...', 'text-on-surface-variant');
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (micErr) {
+        addTranscriptLine('WARN', 'Microphone denied — agent needs mic for audio stream. Allow mic and try again.', 'text-error');
+        throw new Error(`Mic permission denied: ${micErr.message}`);
+      }
 
       // Start the conversational AI agent
+      addTranscriptLine('SYS', 'Connecting to ElevenLabs agent...', 'text-on-surface-variant');
       agentConversation = await Conversation.startSession({
         signedUrl: signed_url,
 
@@ -541,10 +553,11 @@
         onStatusChange: ({ status }) => {
           console.log('[Agent] Status:', status);
           if (status === 'connected') {
-            addTranscriptLine('SYS', 'Agent connected — voice narration active 🎙️', 'text-secondary');
+            addTranscriptLine('SYS', 'Agent connected — voice narration active', 'text-secondary');
           }
           if (status === 'disconnected') {
             addTranscriptLine('SYS', 'Agent session ended', 'text-on-surface-variant');
+            agentConversation = null;
             // If verdict data ready, show verdict screen
             if (verdictData) {
               setTimeout(() => showVerdictScreen(verdictData), 1500);
@@ -552,9 +565,9 @@
           }
         },
 
-        onError: (error) => {
-          console.error('[Agent] Error:', error);
-          addTranscriptLine('ERROR', `Agent error: ${typeof error === 'string' ? error : 'Connection issue'}`, 'text-error');
+        onError: (error, context) => {
+          console.error('[Agent] Error:', error, context);
+          addTranscriptLine('ERROR', `Agent: ${typeof error === 'string' ? error : 'Connection issue'}`, 'text-error');
         }
       });
 
@@ -563,18 +576,33 @@
 
     } catch (err) {
       console.error('[Agent] Start failed:', err);
-      addTranscriptLine('ERROR', `Agent failed to start: ${err.message}`, 'text-error');
-      addTranscriptLine('SYS', 'Visual crawl will continue without voice narration', 'text-on-surface-variant');
+      addTranscriptLine('ERROR', `Agent failed: ${err.message}`, 'text-error');
+      addTranscriptLine('SYS', 'Retrying without voice... Running text-only crawl.', 'text-on-surface-variant');
 
-      // Fallback: still run the backend crawl via legacy endpoint
+      // Fallback: trigger the search phases manually via API
+      runFallbackCrawl(topic, sessionId);
+    }
+  }
+
+  // ── Fallback: run crawl without agent voice ──
+  async function runFallbackCrawl(topic, sid) {
+    const phases = ['reviews', 'reddit', 'news', 'deep_dive', 'verdict'];
+    for (const phase of phases) {
       try {
-        await fetch('/api/vibe-check', {
+        addTranscriptLine('CRAWL', `Searching ${phase}...`, 'text-primary');
+        const res = await fetch('/api/agent-search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic, sessionId }),
+          body: JSON.stringify({ brand: topic, phase }),
         });
-      } catch (e2) {
-        addTranscriptLine('ERROR', e2.message, 'text-error');
+        const data = await res.json();
+        if (data.response) {
+          // Show a summary of what was found
+          const lines = data.response.split('\n').filter(l => l.startsWith('- "'));
+          lines.slice(0, 3).forEach(l => addTranscriptLine('', l.substring(0, 80), 'text-on-surface-variant opacity-70'));
+        }
+      } catch (e) {
+        addTranscriptLine('ERROR', `${phase}: ${e.message}`, 'text-error');
       }
     }
   }
@@ -635,18 +663,21 @@
         // Store verdict data — use captured agent monologue as verdict text
         data.verdict = agentMonologue || data.verdict || 'The agent has delivered the verdict.';
         verdictData = data;
-        console.log('[Complete] Verdict data ready. Agent speaking:', !!agentConversation);
-        // If agent already disconnected, show verdict now
-        if (!agentConversation) {
-          setTimeout(() => showVerdictScreen(data), 1500);
-        }
-        // Otherwise, wait for agent to finish speaking (onStatusChange → disconnected)
-        // Safety timeout: show verdict after 15s regardless
+        console.log('[Complete] Verdict data ready. Agent active:', !!agentConversation);
+        // Give agent 12s to finish speaking, then show verdict
+        // Agent might still be delivering the verdict monologue
         setTimeout(() => {
           if (verdictData && document.getElementById('screen-crawl').classList.contains('active')) {
+            // Update verdict text with any additional agent speech captured
+            verdictData.verdict = agentMonologue || verdictData.verdict;
             showVerdictScreen(verdictData);
+            // End agent session after showing verdict
+            if (agentConversation) {
+              try { agentConversation.endSession(); } catch(e) {}
+              agentConversation = null;
+            }
           }
-        }, 15000);
+        }, 12000);
         break;
 
       case 'error':

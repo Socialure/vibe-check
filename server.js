@@ -215,8 +215,30 @@ function extractTriggers(allResults, isRoast) {
 // The agent calls this tool in phases: reviews → reddit → news → deep_dive → verdict
 // Each call returns text that the agent's LLM uses to generate narration
 app.post('/api/agent-search', async (req, res) => {
-  const { brand, phase } = req.body;
-  console.log(`\n🤖 Agent webhook: brand="${brand}", phase="${phase || 'all'}"`);
+  // Log full body for debugging ElevenLabs webhook format
+  console.log(`\n🤖 Agent webhook received:`, JSON.stringify(req.body).substring(0, 500));
+
+  // ElevenLabs may nest parameters differently — extract brand/phase flexibly
+  let brand = req.body.brand;
+  let phase = req.body.phase;
+
+  // If ElevenLabs wraps in a "parameters" object
+  if (!brand && req.body.parameters) {
+    brand = req.body.parameters.brand;
+    phase = req.body.parameters.phase;
+  }
+
+  // If brand/phase still missing, try to find them anywhere in the body
+  if (!brand) {
+    brand = activeSession?.topic || 'unknown';
+    console.log(`  ⚠️ No brand in request, using session topic: "${brand}"`);
+  }
+  if (!phase) {
+    phase = 'reviews';
+    console.log(`  ⚠️ No phase in request, defaulting to: "${phase}"`);
+  }
+
+  console.log(`  → brand="${brand}", phase="${phase}"`);
 
   // If no active session, create one (agent started before frontend)
   if (!activeSession) {
