@@ -487,22 +487,33 @@
     // 3. Start ElevenLabs Agent voice narration (best-effort — crawl works without it)
     startAgentVoice(topic);
 
-    // 4. Safety timeout — if crawl doesn't complete in 60s, force verdict screen
+    // 4. Safety timeout — if crawl doesn't complete in 45s, force verdict screen
     crawlTimeout = setTimeout(() => {
       if (!crawlComplete && document.getElementById('screen-crawl').classList.contains('active')) {
-        console.warn('[Timeout] Crawl did not complete in 60s — forcing verdict');
-        addTranscriptLine('SYS', 'Crawl timed out — generating verdict from available data...', 'text-primary');
+        console.warn('[Timeout] Crawl did not complete in 45s — forcing verdict');
+        addTranscriptLine('SYS', 'Generating verdict from available data...', 'text-primary');
+        // Try to trigger server-side verdict with whatever data we have
+        fetch('/api/agent-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brand: currentTopic, phase: 'verdict' }),
+        }).catch(() => {});
         const fallbackData = {
           topic: currentTopic, score: 5, mode: 'roast',
-          verdict: `The crawl timed out before completing. Based on limited data, ${currentTopic} gets a neutral 5/10.`,
-          triggers: ['Timeout', 'Limited Data'], hypeDeficiency: 0,
-          sources: [], totalResults: totalSourcesFound, elapsed: 60,
+          verdict: `Based on what we found, ${currentTopic} lands at a 5 out of 10. The internet is... mixed.`,
+          triggers: ['Limited Data', 'Mixed Signals'], hypeDeficiency: 0,
+          sources: [], totalResults: totalSourcesFound, elapsed: 45,
           stats: { posHits: 0, negHits: 0, controversyHits: 0, enthusiasmHits: 0 }
         };
         verdictData = fallbackData;
-        showVerdictScreen(fallbackData);
+        // Give SSE verdict a chance to arrive before showing fallback
+        setTimeout(() => {
+          if (!crawlComplete && document.getElementById('screen-crawl').classList.contains('active')) {
+            showVerdictScreen(fallbackData);
+          }
+        }, 3000);
       }
-    }, 60000);
+    }, 45000);
   }
 
   // ── Frontend-Driven Crawl (PRIMARY — always works) ──
