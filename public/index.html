@@ -174,9 +174,9 @@
       <div class="md:col-span-4 bg-surface-container-low rounded-xl p-6 border border-outline-variant/5">
         <div class="flex items-center gap-3 mb-4">
           <div class="w-2 h-2 rounded-full bg-error animate-pulse"></div>
-          <span class="text-[10px] font-black tracking-widest text-on-surface-variant uppercase">VOICE NARRATION</span>
+          <span class="text-[10px] font-black tracking-widest text-on-surface-variant uppercase">AI AGENT NARRATION</span>
         </div>
-        <p class="text-on-surface-variant text-xs leading-relaxed">Our AI voice agent narrates the analysis live as it happens, using ElevenLabs TTS. Hear the verdict in real-time.</p>
+        <p class="text-on-surface-variant text-xs leading-relaxed">Our ElevenLabs Conversational AI agent narrates the analysis live, reacting to findings in real-time with voice.</p>
       </div>
       <div class="md:col-span-8 bg-surface-container rounded-xl p-8 flex items-center gap-6">
         <div class="w-14 h-14 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
@@ -395,32 +395,27 @@
   </main>
 </div>
 
-<!-- JAVASCRIPT -->
-<script>
+<!-- JAVASCRIPT — ElevenLabs Agent Integration -->
+<script type="module">
+  // ── Import ElevenLabs Client SDK ──
+  let Conversation;
+  try {
+    const mod = await import('https://esm.sh/@11labs/client@0.3.0');
+    Conversation = mod.Conversation;
+    console.log('[Agent] ElevenLabs SDK loaded ✅');
+  } catch (e) {
+    console.warn('[Agent] SDK load failed, will retry on start:', e.message);
+  }
+
   let sessionId = null;
   let eventSource = null;
-  let audioQueue = [];
-  let isPlaying = false;
-  let currentAudio = null;
   let verdictData = null;
   let totalSourcesFound = 0;
   let crawlStartTime = null;
-  let verdictAudioB64 = null;
   let currentTopic = '';
-
-  // AudioContext — created on first user click to unlock browser audio
-  let audioCtx = null;
-
-  function ensureAudioContext() {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      console.log('[Audio] AudioContext created, state:', audioCtx.state);
-    }
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-      console.log('[Audio] AudioContext resumed');
-    }
-  }
+  let agentConversation = null;  // ElevenLabs agent session
+  let agentMonologue = '';       // Captured agent speech text
+  let inVerdictPhase = false;    // Track when we're in verdict mode
 
   // ── Screen Management ──
   function showScreen(name) {
@@ -431,12 +426,14 @@
 
   function resetToLanding() {
     if (eventSource) { eventSource.close(); eventSource = null; }
-    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
-    audioQueue = [];
-    isPlaying = false;
+    if (agentConversation) {
+      try { agentConversation.endSession(); } catch(e) {}
+      agentConversation = null;
+    }
     totalSourcesFound = 0;
     verdictData = null;
-    verdictAudioB64 = null;
+    agentMonologue = '';
+    inVerdictPhase = false;
     showScreen('landing');
     document.getElementById('topic-input').value = '';
     document.getElementById('topic-input').focus();
@@ -453,17 +450,13 @@
     const topic = input.value.trim();
     if (!topic) return;
 
-    // CRITICAL: Unlock audio on user gesture
-    ensureAudioContext();
-
     currentTopic = topic;
     sessionId = crypto.randomUUID();
     crawlStartTime = Date.now();
     totalSourcesFound = 0;
-    audioQueue = [];
-    isPlaying = false;
-    verdictAudioB64 = null;
     verdictData = null;
+    agentMonologue = '';
+    inVerdictPhase = false;
 
     // Reset crawl screen
     document.getElementById('transcript-feed').innerHTML = '';
@@ -479,12 +472,11 @@
 
     showScreen('crawl');
 
-    // Connect SSE first
+    // Start the backend session + SSE for visual updates
     connectSSE(sessionId);
 
-    // Fire POST to start processing
     try {
-      await fetch('/api/vibe-check', {
+      await fetch('/api/start-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic, sessionId }),
@@ -492,9 +484,102 @@
     } catch (err) {
       addTranscriptLine('ERROR', err.message, 'text-error');
     }
+
+    // ── Start ElevenLabs Agent Conversation ──
+    addTranscriptLine('SYS', 'Starting AI agent...', 'text-primary');
+
+    try {
+      // Lazy-load SDK if first load failed
+      if (!Conversation) {
+        const mod = await import('https://esm.sh/@11labs/client@0.3.0');
+        Conversation = mod.Conversation;
+      }
+
+      // Get signed URL from our server (keeps API key server-side)
+      const urlRes = await fetch('/api/signed-url');
+      if (!urlRes.ok) throw new Error(`Signed URL failed: ${urlRes.status}`);
+      const { signed_url } = await urlRes.json();
+
+      // Request mic permission upfront (required by SDK for WebSocket audio)
+      // The agent will talk; user doesn't need to speak
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Start the conversational AI agent
+      agentConversation = await Conversation.startSession({
+        signedUrl: signed_url,
+
+        // Inject the topic as a dynamic variable — agent prompt uses {{topic}}
+        dynamicVariables: {
+          topic: topic
+        },
+
+        // Agent speaks → we update UI
+        onMessage: ({ message, source }) => {
+          console.log(`[Agent] ${source}: ${message}`);
+          if (source === 'ai') {
+            addTranscriptLine('AGENT', message, 'text-on-surface');
+            // Capture verdict monologue text
+            if (inVerdictPhase) {
+              agentMonologue += (agentMonologue ? ' ' : '') + message;
+            }
+          }
+        },
+
+        // Speaking/listening mode — visual feedback
+        onModeChange: ({ mode }) => {
+          const indicator = document.getElementById('speaker-indicator');
+          const icon = document.getElementById('pulse-icon');
+          if (mode === 'speaking') {
+            indicator.classList.add('speaker-active');
+            icon.textContent = 'graphic_eq';
+          } else {
+            indicator.classList.remove('speaker-active');
+            icon.textContent = 'sensors';
+          }
+        },
+
+        onStatusChange: ({ status }) => {
+          console.log('[Agent] Status:', status);
+          if (status === 'connected') {
+            addTranscriptLine('SYS', 'Agent connected — voice narration active 🎙️', 'text-secondary');
+          }
+          if (status === 'disconnected') {
+            addTranscriptLine('SYS', 'Agent session ended', 'text-on-surface-variant');
+            // If verdict data ready, show verdict screen
+            if (verdictData) {
+              setTimeout(() => showVerdictScreen(verdictData), 1500);
+            }
+          }
+        },
+
+        onError: (error) => {
+          console.error('[Agent] Error:', error);
+          addTranscriptLine('ERROR', `Agent error: ${typeof error === 'string' ? error : 'Connection issue'}`, 'text-error');
+        }
+      });
+
+      console.log('[Agent] Conversation started! Agent will speak and search automatically.');
+      addTranscriptLine('SYS', `Agent is live — vibe checking "${topic}"`, 'text-primary');
+
+    } catch (err) {
+      console.error('[Agent] Start failed:', err);
+      addTranscriptLine('ERROR', `Agent failed to start: ${err.message}`, 'text-error');
+      addTranscriptLine('SYS', 'Visual crawl will continue without voice narration', 'text-on-surface-variant');
+
+      // Fallback: still run the backend crawl via legacy endpoint
+      try {
+        await fetch('/api/vibe-check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic, sessionId }),
+        });
+      } catch (e2) {
+        addTranscriptLine('ERROR', e2.message, 'text-error');
+      }
+    }
   }
 
-  // ── SSE Connection ──
+  // ── SSE Connection (for visual crawl updates from backend webhook) ──
   function connectSSE(sid) {
     if (eventSource) eventSource.close();
     eventSource = new EventSource(`/api/stream/${sid}`);
@@ -509,16 +594,17 @@
     };
   }
 
-  // ── Handle SSE Events ──
+  // ── Handle SSE Events (backend → frontend visual updates) ──
   function handleSSE(data) {
     switch (data.type) {
       case 'connected':
-        addTranscriptLine('SYS', 'Connected to Vibe Check engine', 'text-on-surface-variant');
+        addTranscriptLine('SYS', 'Connected to crawl engine', 'text-on-surface-variant');
         break;
 
       case 'phase':
-        addTranscriptLine('INFO', data.message, 'text-primary');
+        addTranscriptLine('CRAWL', data.message, 'text-primary');
         updateSynergy(data.phase);
+        if (data.phase === 'analyzing') inVerdictPhase = true;
         break;
 
       case 'search_done':
@@ -536,20 +622,8 @@
         document.getElementById('heat-bar').style.width = heatEst + '%';
         break;
 
-      case 'narration':
-        addTranscriptLine('AGENT', data.text, 'text-on-surface');
-        break;
-
-      case 'audio':
-        console.log('[Audio] Received audio clip for phase:', data.phase, '| queue length:', audioQueue.length);
-        if (data.phase === 'verdict') {
-          verdictAudioB64 = data.audio;
-        }
-        audioQueue.push({ audio: data.audio, phase: data.phase });
-        if (!isPlaying) playNextAudio();
-        break;
-
       case 'score_reveal':
+        inVerdictPhase = true;
         addTranscriptLine('SCORE', `Vibe Score: ${data.score}/10 — ${data.mode.toUpperCase()}`, data.isRoast ? 'text-primary' : 'text-secondary');
         document.getElementById('confidence-value').textContent = 'HIGH';
         document.getElementById('confidence-text').textContent = `Score calculated: ${data.score}/10`;
@@ -558,12 +632,21 @@
         break;
 
       case 'complete':
+        // Store verdict data — use captured agent monologue as verdict text
+        data.verdict = agentMonologue || data.verdict || 'The agent has delivered the verdict.';
         verdictData = data;
-        console.log('[Complete] Audio queue:', audioQueue.length, 'isPlaying:', isPlaying);
-        // Wait for audio queue to finish, then show verdict
-        if (audioQueue.length === 0 && !isPlaying) {
+        console.log('[Complete] Verdict data ready. Agent speaking:', !!agentConversation);
+        // If agent already disconnected, show verdict now
+        if (!agentConversation) {
           setTimeout(() => showVerdictScreen(data), 1500);
         }
+        // Otherwise, wait for agent to finish speaking (onStatusChange → disconnected)
+        // Safety timeout: show verdict after 15s regardless
+        setTimeout(() => {
+          if (verdictData && document.getElementById('screen-crawl').classList.contains('active')) {
+            showVerdictScreen(verdictData);
+          }
+        }, 15000);
         break;
 
       case 'error':
@@ -574,7 +657,7 @@
 
   // ── Synergy % animation ──
   function updateSynergy(phase) {
-    const phases = { opening: 10, reviews: 30, opinions: 55, news: 75, deep_dive: 88, analyzing: 95 };
+    const phases = { opening: 10, reviews: 30, reddit: 50, opinions: 55, news: 75, deep_dive: 88, analyzing: 95 };
     const pct = phases[phase] || 0;
     document.getElementById('synergy-pct').textContent = pct + '%';
 
@@ -602,76 +685,6 @@
     `;
     feed.appendChild(div);
     feed.scrollTop = feed.scrollHeight;
-  }
-
-  // ── Audio Playback via AudioContext (browser-compatible) ──
-  async function playNextAudio() {
-    if (audioQueue.length === 0) {
-      isPlaying = false;
-      document.getElementById('speaker-indicator').classList.remove('speaker-active');
-      document.getElementById('pulse-icon').textContent = 'sensors';
-      console.log('[Audio] Queue empty, isPlaying = false');
-      // If verdict data is ready, show verdict screen
-      if (verdictData) {
-        setTimeout(() => showVerdictScreen(verdictData), 1200);
-      }
-      return;
-    }
-
-    isPlaying = true;
-    const item = audioQueue.shift();
-    const base64 = item.audio;
-    const phase = item.phase;
-
-    console.log('[Audio] Playing clip for phase:', phase, '| remaining in queue:', audioQueue.length);
-
-    // Visual feedback — show speaking state
-    document.getElementById('speaker-indicator').classList.add('speaker-active');
-    document.getElementById('pulse-icon').textContent = 'graphic_eq';
-
-    try {
-      // Decode base64 to ArrayBuffer
-      const binaryStr = atob(base64);
-      const bytes = new Uint8Array(binaryStr.length);
-      for (let i = 0; i < binaryStr.length; i++) {
-        bytes[i] = binaryStr.charCodeAt(i);
-      }
-
-      // Use AudioContext to decode and play (bypasses autoplay restrictions since ctx was created on user gesture)
-      ensureAudioContext();
-      const audioBuffer = await audioCtx.decodeAudioData(bytes.buffer.slice(0));
-      const source = audioCtx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioCtx.destination);
-
-      source.onended = () => {
-        console.log('[Audio] Clip ended for phase:', phase);
-        document.getElementById('pulse-icon').textContent = 'sensors';
-        playNextAudio();
-      };
-
-      source.start(0);
-      console.log('[Audio] Playing! Duration:', audioBuffer.duration.toFixed(1), 's');
-    } catch (err) {
-      console.error('[Audio] Playback error:', err);
-      // Fallback: try HTML5 Audio element
-      try {
-        currentAudio = new Audio(`data:audio/mpeg;base64,${base64}`);
-        currentAudio.addEventListener('ended', () => {
-          document.getElementById('pulse-icon').textContent = 'sensors';
-          playNextAudio();
-        });
-        currentAudio.addEventListener('error', () => {
-          console.error('[Audio] HTML5 Audio fallback also failed');
-          playNextAudio();
-        });
-        await currentAudio.play();
-        console.log('[Audio] HTML5 Audio fallback playing');
-      } catch (e2) {
-        console.error('[Audio] All playback methods failed:', e2);
-        playNextAudio();
-      }
-    }
   }
 
   // ── Show Verdict Screen ──
@@ -707,14 +720,8 @@
     scoreBig.textContent = data.score + '/10';
     scoreBig.className = `font-black text-6xl md:text-8xl tracking-tighter score-reveal ${isRoast ? 'text-on-primary-container' : 'text-on-secondary'}`;
 
-    // Audio bar
-    const audioBar = document.getElementById('audio-bar');
-    if (verdictAudioB64) {
-      audioBar.classList.remove('hidden');
-      const playBtn = document.getElementById('verdict-play-btn');
-      playBtn.className = `w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${isRoast ? 'bg-primary text-on-primary' : 'bg-secondary text-on-secondary'}`;
-      document.getElementById('verdict-audio-progress').className = `h-full rounded-full transition-all duration-100 ${isRoast ? 'bg-primary' : 'bg-secondary'}`;
-    }
+    // Audio bar hidden — agent handles voice via ElevenLabs SDK
+    document.getElementById('audio-bar').classList.add('hidden');
 
     // Monologue
     const headlines = isRoast
@@ -765,38 +772,6 @@
 
     showScreen('verdict');
   }
-
-  // ── Toggle verdict audio ──
-  function toggleVerdictAudio() {
-    if (!verdictAudioB64) return;
-    const btn = document.getElementById('verdict-play-btn');
-    const progress = document.getElementById('verdict-audio-progress');
-    const statusText = document.getElementById('audio-status-text');
-
-    if (currentAudio && !currentAudio.paused) {
-      currentAudio.pause();
-      btn.querySelector('.material-symbols-outlined').textContent = 'play_arrow';
-      statusText.textContent = 'Paused';
-      return;
-    }
-
-    currentAudio = new Audio(`data:audio/mpeg;base64,${verdictAudioB64}`);
-    btn.querySelector('.material-symbols-outlined').textContent = 'pause';
-    statusText.textContent = 'Playing';
-
-    currentAudio.addEventListener('timeupdate', () => {
-      if (currentAudio.duration) {
-        progress.style.width = `${(currentAudio.currentTime / currentAudio.duration) * 100}%`;
-      }
-    });
-    currentAudio.addEventListener('ended', () => {
-      btn.querySelector('.material-symbols-outlined').textContent = 'play_arrow';
-      statusText.textContent = 'Listen again';
-      progress.style.width = '0%';
-    });
-    currentAudio.play().catch(() => {});
-  }
-  window.toggleVerdictAudio = toggleVerdictAudio;
 
   // ── Share on X ──
   function shareOnX() {
