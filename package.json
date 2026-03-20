@@ -9,10 +9,16 @@
     "dev": "node --watch server.js",
     "setup": "node setup-agent.js"
   },
-  "keywords": ["elevenlabs", "firecrawl", "voice-ai", "hackathon"],
+  "keywords": [
+    "elevenlabs",
+    "firecrawl",
+    "voice-ai",
+    "hackathon"
+  ],
   "license": "MIT",
   "dependencies": {
-    "express": "^4.21.0",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^4.21.0"
   }
 }
