@@ -15,16 +15,29 @@ app.use(express.static(join(__dirname, 'public')));
 
 const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+let SERVER_URL = process.env.SERVER_URL; // e.g. https://vibe-check-ai.onrender.com
+
+// ── Auto-detect server URL from first request ──────────────────────
+let urlDetected = false;
+app.use((req, res, next) => {
+  if (!urlDetected && !SERVER_URL && req.headers.host && !req.headers.host.includes('localhost')) {
+    const proto = req.headers['x-forwarded-proto'] || 'https';
+    SERVER_URL = `${proto}://${req.headers.host}`;
+    urlDetected = true;
+    console.log(`🔍 Auto-detected server URL: ${SERVER_URL}`);
+    // Update webhook URL with detected URL
+    updateAgentWebhookUrl();
+  }
+  next();
+});
 
 // Load agent config for signed URL generation
-// Priority: env var > agent-config.json > hardcoded fallback
 let AGENT_ID = process.env.ELEVENLABS_AGENT_ID;
 if (!AGENT_ID) {
   try {
     const agentConfig = JSON.parse(readFileSync(join(__dirname, 'agent-config.json'), 'utf-8'));
     AGENT_ID = agentConfig.agent_id;
   } catch (e) {
-    // Hardcoded fallback — agent ID is not a secret (it's in the public widget)
     AGENT_ID = 'agent_9901km4fzxnqehd9yftccq7wnjbq';
     console.log('ℹ️ Using hardcoded agent ID (agent-config.json not found)');
   }
@@ -216,24 +229,158 @@ function extractTriggers(allResults, isRoast) {
   }
 }
 
+// ── Phase search configs ────────────────────────────────────────────
+function getSearchConfigs(brand) {
+  const quotedBrand = `"${brand}"`;
+  return {
+    reviews: { query: `${quotedBrand} review opinion latest 2025 2026`, label: 'Reviews & Coverage', limit: 5 },
+    reddit: { query: `${quotedBrand} reddit think opinion honest review`, label: 'Reddit & Forums', limit: 5 },
+    news: { query: `${quotedBrand} news controversy drama latest`, label: 'News & Drama', limit: 5 },
+    deep_dive: { query: `${quotedBrand} twitter social media trending sentiment`, label: 'Social Media Deep Dive', limit: 4 },
+  };
+}
+
+// ── Run a single search phase ────────────────────────────────────────
+async function runSearchPhase(brand, phase, sessionId) {
+  const searchConfigs = getSearchConfigs(brand);
+  const config = searchConfigs[phase];
+  if (!config) return null;
+
+  emit(sessionId, { type: 'phase', phase, message: `Searching ${config.label} for "${brand}"...` });
+
+  const results = await firecrawlSearch(config.query, config.limit);
+  if (activeSession) {
+    activeSession.results.push(...results);
+    activeSession.phasesDone.push(phase);
+  }
+
+  // Send search results to frontend for visual display
+  emit(sessionId, {
+    type: 'search_done',
+    label: config.label,
+    count: results.length,
+    titles: results.slice(0, 4).map(r => r.title || r.url || 'Untitled'),
+  });
+
+  // Build summary for agent narration
+  const summaries = results.slice(0, 5).map(r => {
+    const title = r.title || 'Untitled';
+    const snippet = (r.description || (r.markdown || '').substring(0, 150)).substring(0, 200);
+    return `- "${title}": ${snippet}`;
+  }).join('\n');
+
+  const sentiment = analyzeSentiment(results);
+  return { results, summaries, sentiment, label: config.label, count: results.length };
+}
+
+// ── Run verdict calculation ──────────────────────────────────────────
+function runVerdict(brand, sessionId) {
+  emit(sessionId, { type: 'phase', phase: 'analyzing', message: 'Calculating Vibe Index...' });
+
+  const allResults = activeSession?.results || [];
+  const analysis = calculateVibeScore(allResults);
+  const mode = analysis.isRoast ? 'roast' : 'hype';
+  const triggers = extractTriggers(allResults, analysis.isRoast);
+
+  console.log(`  📊 Score: ${analysis.score}/10 (${mode}), +${analysis.posHits}/-${analysis.negHits}`);
+
+  emit(sessionId, {
+    type: 'score_reveal',
+    score: analysis.score,
+    isRoast: analysis.isRoast,
+    mode,
+    hypeDeficiency: analysis.hypeDeficiency,
+    triggers,
+  });
+
+  const elapsed = activeSession ? ((Date.now() - activeSession.startTime) / 1000).toFixed(1) : '0';
+
+  // Send complete event after delay for agent to speak
+  setTimeout(() => {
+    emit(sessionId, {
+      type: 'complete',
+      topic: brand,
+      score: analysis.score,
+      mode,
+      verdict: '',
+      triggers,
+      hypeDeficiency: analysis.hypeDeficiency,
+      sources: allResults.map(r => ({ title: r.title, url: r.url })).filter(s => s.url).slice(0, 10),
+      totalResults: allResults.length,
+      elapsed: parseFloat(elapsed),
+      stats: {
+        posHits: analysis.posHits,
+        negHits: analysis.negHits,
+        controversyHits: analysis.controversyHits,
+        enthusiasmHits: analysis.enthusiasmHits,
+      },
+    });
+  }, 5000);
+
+  return { analysis, mode, triggers };
+}
+
+// ── NEW: Frontend-driven crawl endpoint ──────────────────────────────
+// Runs ALL phases sequentially and streams results via SSE
+// This is the primary crawl mechanism — does NOT depend on agent webhook
+app.post('/api/run-crawl', async (req, res) => {
+  const { topic, sessionId } = req.body;
+  if (!topic || !sessionId) {
+    return res.status(400).json({ error: 'topic and sessionId required' });
+  }
+
+  console.log(`\n🚀 Frontend-driven crawl: "${topic}" (${sessionId})`);
+
+  // Create session
+  activeSession = { sessionId, topic, results: [], phasesDone: [], startTime: Date.now() };
+  emit(sessionId, { type: 'phase', phase: 'opening', message: `Initializing Vibe Check for "${topic}"...` });
+
+  // Respond immediately — crawl runs async, results stream via SSE
+  res.json({ ok: true, message: 'Crawl started' });
+
+  // Run phases sequentially with delays for dramatic effect
+  const phases = ['reviews', 'reddit', 'news', 'deep_dive'];
+  const phaseResults = [];
+
+  for (const phase of phases) {
+    // Small delay between phases for visual pacing
+    await new Promise(r => setTimeout(r, 1500));
+
+    const result = await runSearchPhase(topic, phase, sessionId);
+    if (result) {
+      phaseResults.push(result);
+
+      // Emit phase summary for the agent narration context
+      emit(sessionId, {
+        type: 'phase_summary',
+        phase,
+        label: result.label,
+        count: result.count,
+        sentiment: result.sentiment,
+        summaries: result.summaries,
+      });
+    }
+  }
+
+  // Final verdict
+  await new Promise(r => setTimeout(r, 2000));
+  runVerdict(topic, sessionId);
+});
+
 // ── Agent Webhook — called by ElevenLabs Conversational Agent ───────
-// The agent calls this tool in phases: reviews → reddit → news → deep_dive → verdict
-// Each call returns text that the agent's LLM uses to generate narration
+// ALSO works as a direct API for the fallback crawl
 app.post('/api/agent-search', async (req, res) => {
-  // Log full body for debugging ElevenLabs webhook format
   console.log(`\n🤖 Agent webhook received:`, JSON.stringify(req.body).substring(0, 500));
 
-  // ElevenLabs may nest parameters differently — extract brand/phase flexibly
   let brand = req.body.brand;
   let phase = req.body.phase;
 
-  // If ElevenLabs wraps in a "parameters" object
+  // ElevenLabs may nest parameters
   if (!brand && req.body.parameters) {
     brand = req.body.parameters.brand;
     phase = req.body.parameters.phase;
   }
 
-  // If brand/phase still missing, try to find them anywhere in the body
   if (!brand) {
     brand = activeSession?.topic || 'unknown';
     console.log(`  ⚠️ No brand in request, using session topic: "${brand}"`);
@@ -245,7 +392,7 @@ app.post('/api/agent-search', async (req, res) => {
 
   console.log(`  → brand="${brand}", phase="${phase}"`);
 
-  // If no active session, create one (agent started before frontend)
+  // Create session if none exists
   if (!activeSession) {
     const fallbackSid = 'agent-' + Date.now();
     activeSession = { sessionId: fallbackSid, topic: brand, results: [], phasesDone: [], startTime: Date.now() };
@@ -253,57 +400,10 @@ app.post('/api/agent-search', async (req, res) => {
   }
 
   const { sessionId } = activeSession;
-  const quotedBrand = `"${brand}"`;
-
-  // Phase configs
-  const searchConfigs = {
-    reviews: { query: `${quotedBrand} review opinion latest 2025 2026`, label: 'Reviews & Coverage', limit: 5 },
-    reddit: { query: `${quotedBrand} reddit think opinion honest review`, label: 'Reddit & Forums', limit: 5 },
-    news: { query: `${quotedBrand} news controversy drama latest`, label: 'News & Drama', limit: 5 },
-    deep_dive: { query: `${quotedBrand} twitter social media trending sentiment`, label: 'Social Media Deep Dive', limit: 4 },
-  };
 
   // ── VERDICT phase ──
   if (phase === 'verdict') {
-    emit(sessionId, { type: 'phase', phase: 'analyzing', message: 'Calculating Vibe Index...' });
-
-    const analysis = calculateVibeScore(activeSession.results);
-    const mode = analysis.isRoast ? 'roast' : 'hype';
-    const triggers = extractTriggers(activeSession.results, analysis.isRoast);
-
-    console.log(`  📊 Score: ${analysis.score}/10 (${mode}), +${analysis.posHits}/-${analysis.negHits}`);
-
-    emit(sessionId, {
-      type: 'score_reveal',
-      score: analysis.score,
-      isRoast: analysis.isRoast,
-      mode,
-      hypeDeficiency: analysis.hypeDeficiency,
-      triggers,
-    });
-
-    // Send complete event after a delay (give agent time to speak verdict)
-    setTimeout(() => {
-      const elapsed = ((Date.now() - activeSession.startTime) / 1000).toFixed(1);
-      emit(sessionId, {
-        type: 'complete',
-        topic: brand,
-        score: analysis.score,
-        mode,
-        verdict: '', // Agent speaks this dynamically
-        triggers,
-        hypeDeficiency: analysis.hypeDeficiency,
-        sources: activeSession.results.map(r => ({ title: r.title, url: r.url })).filter(s => s.url).slice(0, 10),
-        totalResults: activeSession.results.length,
-        elapsed: parseFloat(elapsed),
-        stats: {
-          posHits: analysis.posHits,
-          negHits: analysis.negHits,
-          controversyHits: analysis.controversyHits,
-          enthusiasmHits: analysis.enthusiasmHits,
-        },
-      });
-    }, 8000); // 8s delay so agent can speak the verdict before screen transitions
+    const { analysis, mode, triggers } = runVerdict(brand, sessionId);
 
     const verdictResponse = [
       `FINAL VIBE SCORE CALCULATION for ${brand}:`,
@@ -313,7 +413,7 @@ app.post('/api/agent-search', async (req, res) => {
       `Negative signals found: ${analysis.negHits}`,
       `Controversy signals: ${analysis.controversyHits}`,
       `Enthusiasm signals: ${analysis.enthusiasmHits}`,
-      `Total sources analyzed: ${activeSession.results.length}`,
+      `Total sources analyzed: ${(activeSession?.results || []).length}`,
       `${analysis.isRoast ? 'Key Weaknesses' : 'Key Strengths'}: ${triggers.join(', ')}`,
       ``,
       `YOUR TASK: Deliver the FINAL VERDICT as a 4-6 sentence monologue.`,
@@ -329,47 +429,23 @@ app.post('/api/agent-search', async (req, res) => {
   }
 
   // ── SEARCH phases ──
-  const config = searchConfigs[phase];
-  if (!config) {
+  const result = await runSearchPhase(brand, phase, sessionId);
+  if (!result) {
     return res.json({
       response: `Unknown phase "${phase}". Valid phases: reviews, reddit, news, deep_dive, verdict. Start with "reviews".`,
     });
   }
 
-  emit(sessionId, { type: 'phase', phase, message: `Searching ${config.label} for "${brand}"...` });
-
-  const results = await firecrawlSearch(config.query, config.limit);
-  activeSession.results.push(...results);
-  activeSession.phasesDone.push(phase);
-
-  // Send search results to frontend for visual display
-  emit(sessionId, {
-    type: 'search_done',
-    label: config.label,
-    count: results.length,
-    titles: results.slice(0, 4).map(r => r.title || r.url || 'Untitled'),
-  });
-
-  // Build rich text response for the agent's LLM
-  const summaries = results.slice(0, 5).map(r => {
-    const title = r.title || 'Untitled';
-    const snippet = (r.description || (r.markdown || '').substring(0, 150)).substring(0, 200);
-    return `- "${title}": ${snippet}`;
-  }).join('\n');
-
-  const sentiment = analyzeSentiment(results);
-
   const nextPhases = { reviews: 'reddit', reddit: 'news', news: 'deep_dive', deep_dive: 'verdict' };
   const nextPhase = nextPhases[phase];
-
   const phaseNames = { reviews: 'Reviews & Coverage', reddit: 'Reddit & Forums', news: 'News & Drama', deep_dive: 'Social Media' };
 
   const responseText = [
-    `SEARCH RESULTS — ${phaseNames[phase]} (${results.length} results found):`,
-    results.length === 0 ? 'No results found for this search.' : summaries,
+    `SEARCH RESULTS — ${phaseNames[phase]} (${result.count} results found):`,
+    result.count === 0 ? 'No results found for this search.' : result.summaries,
     ``,
-    `Overall sentiment: ${sentiment}`,
-    `Total sources collected so far: ${activeSession.results.length}`,
+    `Overall sentiment: ${result.sentiment}`,
+    `Total sources collected so far: ${(activeSession?.results || []).length}`,
     ``,
     `YOUR TASK: React to these ${phaseNames[phase]} findings in 2-3 SHORT punchy sentences. Be specific — reference titles or sentiments you see.`,
     `Then IMMEDIATELY call vibe_check_search again with brand="${brand}" and phase="${nextPhase}" to continue the investigation.`,
@@ -379,16 +455,6 @@ app.post('/api/agent-search', async (req, res) => {
   ].join('\n');
 
   return res.json({ response: responseText });
-});
-
-// ── Legacy endpoint (fallback) ──────────────────────────────────────
-app.post('/api/vibe-check', async (req, res) => {
-  const { topic, sessionId } = req.body;
-  if (!topic) return res.status(400).json({ error: 'Topic required' });
-  // Just start a session — the agent will do the actual searching
-  activeSession = { sessionId, topic, results: [], phasesDone: [], startTime: Date.now() };
-  console.log(`\n🎯 Legacy start: "${topic}" (${sessionId})`);
-  res.json({ sessionId, status: 'started' });
 });
 
 // ── Signed URL for client-side ElevenLabs agent connection ───────────
@@ -415,6 +481,73 @@ app.get('/api/signed-url', async (req, res) => {
   }
 });
 
+// ── Auto-fix webhook URL on startup ──────────────────────────────────
+async function updateAgentWebhookUrl() {
+  if (!SERVER_URL || !ELEVENLABS_API_KEY || !AGENT_ID) {
+    console.log('⚠️ Cannot auto-update webhook URL (missing SERVER_URL, API key, or agent ID)');
+    return;
+  }
+
+  const correctUrl = `${SERVER_URL}/api/agent-search`;
+  console.log(`🔧 Updating agent webhook URL to: ${correctUrl}`);
+
+  try {
+    // Get current agent config
+    const getRes = await fetch(`https://api.elevenlabs.io/v1/convai/agents/${AGENT_ID}`, {
+      headers: { 'xi-api-key': ELEVENLABS_API_KEY },
+    });
+    if (!getRes.ok) {
+      console.error('❌ Failed to get agent config:', getRes.status);
+      return;
+    }
+    const agentConfig = await getRes.json();
+
+    // Find and update the webhook tool URL
+    const tools = agentConfig.conversation_config?.agent?.prompt?.tools || [];
+    let updated = false;
+    for (const tool of tools) {
+      if (tool.type === 'webhook' && tool.api_schema?.url) {
+        if (tool.api_schema.url !== correctUrl) {
+          console.log(`  Old URL: ${tool.api_schema.url}`);
+          tool.api_schema.url = correctUrl;
+          updated = true;
+        } else {
+          console.log('  ✅ Webhook URL already correct');
+        }
+      }
+    }
+
+    if (updated) {
+      // PATCH the agent with updated tool config
+      const patchRes = await fetch(`https://api.elevenlabs.io/v1/convai/agents/${AGENT_ID}`, {
+        method: 'PATCH',
+        headers: {
+          'xi-api-key': ELEVENLABS_API_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          conversation_config: {
+            agent: {
+              prompt: {
+                tools,
+              },
+            },
+          },
+        }),
+      });
+
+      if (patchRes.ok) {
+        console.log('  ✅ Agent webhook URL updated successfully!');
+      } else {
+        const errText = await patchRes.text().catch(() => '');
+        console.error(`  ❌ Failed to update agent: ${patchRes.status} ${errText.substring(0, 200)}`);
+      }
+    }
+  } catch (e) {
+    console.error('❌ Webhook URL update error:', e.message);
+  }
+}
+
 // ── Favicon (prevent 404) ────────────────────────────────────────────
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
@@ -425,6 +558,7 @@ app.get('/api/health', (req, res) => {
     service: 'vibe-check-v3-agent',
     firecrawl: !!FIRECRAWL_API_KEY,
     elevenlabs: !!ELEVENLABS_API_KEY,
+    serverUrl: SERVER_URL || 'not set',
     activeSession: activeSession ? { topic: activeSession.topic, phases: activeSession.phasesDone } : null,
   });
 });
@@ -434,5 +568,9 @@ app.listen(PORT, () => {
   console.log(`\n🎙️  Vibe Check V3 (Agent Mode) on port ${PORT}`);
   console.log(`   Firecrawl: ${FIRECRAWL_API_KEY ? '✅' : '❌'}`);
   console.log(`   ElevenLabs: ${ELEVENLABS_API_KEY ? '✅' : '❌'}`);
+  console.log(`   Server URL: ${SERVER_URL || 'not set'}`);
   console.log(`   Agent webhook: /api/agent-search\n`);
+
+  // Auto-fix webhook URL on startup
+  updateAgentWebhookUrl();
 });

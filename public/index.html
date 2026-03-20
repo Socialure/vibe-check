@@ -395,9 +395,9 @@
   </main>
 </div>
 
-<!-- JAVASCRIPT — ElevenLabs Agent Integration -->
+<!-- JAVASCRIPT — ElevenLabs Agent + Frontend-Driven Crawl -->
 <script type="module">
-  // ── Import ElevenLabs Client SDK (correct package + version) ──
+  // ── Import ElevenLabs Client SDK ──
   let Conversation;
   try {
     const mod = await import('https://esm.sh/@elevenlabs/client@0.15.2');
@@ -413,9 +413,10 @@
   let totalSourcesFound = 0;
   let crawlStartTime = null;
   let currentTopic = '';
-  let agentConversation = null;  // ElevenLabs agent session
-  let agentMonologue = '';       // Captured agent speech text
-  let inVerdictPhase = false;    // Track when we're in verdict mode
+  let agentConversation = null;
+  let agentMonologue = '';
+  let inVerdictPhase = false;
+  let crawlComplete = false;  // Track if crawl finished
 
   // ── Screen Management ──
   function showScreen(name) {
@@ -434,6 +435,7 @@
     verdictData = null;
     agentMonologue = '';
     inVerdictPhase = false;
+    crawlComplete = false;
     showScreen('landing');
     document.getElementById('topic-input').value = '';
     document.getElementById('topic-input').focus();
@@ -457,6 +459,7 @@
     verdictData = null;
     agentMonologue = '';
     inVerdictPhase = false;
+    crawlComplete = false;
 
     // Reset crawl screen
     document.getElementById('transcript-feed').innerHTML = '';
@@ -472,32 +475,73 @@
 
     showScreen('crawl');
 
-    // Start the backend session + SSE for visual updates
+    // 1. Connect SSE for real-time visual updates from the server
     connectSSE(sessionId);
 
+    // 2. Start the frontend-driven crawl (guaranteed to work — doesn't depend on agent webhook)
+    addTranscriptLine('SYS', `Starting crawl for "${topic}"...`, 'text-primary');
+    startFrontendCrawl(topic, sessionId);
+
+    // 3. Start ElevenLabs Agent voice narration (best-effort — crawl works without it)
+    startAgentVoice(topic);
+  }
+
+  // ── Frontend-Driven Crawl (PRIMARY — always works) ──
+  // Calls our own server via relative URL, which triggers Firecrawl + SSE events
+  async function startFrontendCrawl(topic, sid) {
     try {
-      await fetch('/api/start-session', {
+      const res = await fetch('/api/run-crawl', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, sessionId }),
+        body: JSON.stringify({ topic, sessionId: sid }),
       });
+      if (!res.ok) {
+        throw new Error(`Crawl API error: ${res.status}`);
+      }
+      console.log('[Crawl] Frontend-driven crawl started — results will stream via SSE');
     } catch (err) {
-      addTranscriptLine('ERROR', err.message, 'text-error');
+      console.error('[Crawl] Frontend-driven crawl failed:', err);
+      addTranscriptLine('WARN', 'Primary crawl endpoint unavailable, using fallback...', 'text-error');
+      // Fallback: call agent-search directly for each phase
+      runFallbackCrawl(topic, sid);
     }
+  }
 
-    // ── Start ElevenLabs Agent Conversation ──
-    addTranscriptLine('SYS', 'Starting AI agent...', 'text-primary');
+  // ── Fallback Crawl (if /api/run-crawl fails) ──
+  async function runFallbackCrawl(topic, sid) {
+    const phases = ['reviews', 'reddit', 'news', 'deep_dive', 'verdict'];
+    for (const phase of phases) {
+      try {
+        addTranscriptLine('CRAWL', `Searching ${phase}...`, 'text-primary');
+        const res = await fetch('/api/agent-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brand: topic, phase }),
+        });
+        const data = await res.json();
+        if (data.response) {
+          const lines = data.response.split('\n').filter(l => l.startsWith('- "'));
+          lines.slice(0, 3).forEach(l => addTranscriptLine('', l.substring(0, 80), 'text-on-surface-variant opacity-70'));
+        }
+        // Small delay between phases
+        await new Promise(r => setTimeout(r, 1000));
+      } catch (e) {
+        addTranscriptLine('ERROR', `${phase}: ${e.message}`, 'text-error');
+      }
+    }
+  }
+
+  // ── Start Agent Voice Narration (SECONDARY — enhances experience) ──
+  async function startAgentVoice(topic) {
+    addTranscriptLine('SYS', 'Connecting voice agent...', 'text-on-surface-variant');
 
     try {
-      // Lazy-load SDK if first load failed
       if (!Conversation) {
         const mod = await import('https://esm.sh/@elevenlabs/client@0.15.2');
         Conversation = mod.Conversation;
         if (!Conversation) throw new Error('SDK loaded but Conversation class not found');
       }
 
-      // Get signed URL from our server (keeps API key server-side)
-      addTranscriptLine('SYS', 'Requesting agent connection...', 'text-on-surface-variant');
       const urlRes = await fetch('/api/signed-url');
       if (!urlRes.ok) {
         const errBody = await urlRes.text().catch(() => '');
@@ -506,38 +550,27 @@
       const { signed_url } = await urlRes.json();
       if (!signed_url) throw new Error('No signed_url in response');
 
-      // Request mic permission (required by SDK for WebRTC audio — agent talks, user listens)
-      addTranscriptLine('SYS', 'Requesting microphone access...', 'text-on-surface-variant');
+      // Request mic permission
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch (micErr) {
-        addTranscriptLine('WARN', 'Microphone denied — agent needs mic for audio stream. Allow mic and try again.', 'text-error');
         throw new Error(`Mic permission denied: ${micErr.message}`);
       }
 
-      // Start the conversational AI agent
-      addTranscriptLine('SYS', 'Connecting to ElevenLabs agent...', 'text-on-surface-variant');
       agentConversation = await Conversation.startSession({
         signedUrl: signed_url,
+        dynamicVariables: { topic },
 
-        // Inject the topic as a dynamic variable — agent prompt uses {{topic}}
-        dynamicVariables: {
-          topic: topic
-        },
-
-        // Agent speaks → we update UI
         onMessage: ({ message, source }) => {
           console.log(`[Agent] ${source}: ${message}`);
           if (source === 'ai') {
             addTranscriptLine('AGENT', message, 'text-on-surface');
-            // Capture verdict monologue text
             if (inVerdictPhase) {
               agentMonologue += (agentMonologue ? ' ' : '') + message;
             }
           }
         },
 
-        // Speaking/listening mode — visual feedback
         onModeChange: ({ mode }) => {
           const indicator = document.getElementById('speaker-indicator');
           const icon = document.getElementById('pulse-icon');
@@ -553,76 +586,50 @@
         onStatusChange: ({ status }) => {
           console.log('[Agent] Status:', status);
           if (status === 'connected') {
-            addTranscriptLine('SYS', 'Agent connected — voice narration active', 'text-secondary');
+            addTranscriptLine('SYS', 'Voice agent connected — narration active', 'text-secondary');
           }
           if (status === 'disconnected') {
-            addTranscriptLine('SYS', 'Agent session ended', 'text-on-surface-variant');
+            addTranscriptLine('SYS', 'Voice agent session ended', 'text-on-surface-variant');
             agentConversation = null;
-            // If verdict data ready, show verdict screen
-            if (verdictData) {
-              setTimeout(() => showVerdictScreen(verdictData), 1500);
-            }
           }
         },
 
         onError: (error, context) => {
           console.error('[Agent] Error:', error, context);
-          addTranscriptLine('ERROR', `Agent: ${typeof error === 'string' ? error : 'Connection issue'}`, 'text-error');
+          addTranscriptLine('WARN', 'Voice agent encountered an issue — crawl continues', 'text-on-surface-variant');
         }
       });
 
-      console.log('[Agent] Conversation started! Agent will speak and search automatically.');
-      addTranscriptLine('SYS', `Agent is live — vibe checking "${topic}"`, 'text-primary');
+      console.log('[Agent] Voice narration started');
+      addTranscriptLine('SYS', 'Voice narration active', 'text-secondary');
 
     } catch (err) {
-      console.error('[Agent] Start failed:', err);
-      addTranscriptLine('ERROR', `Agent failed: ${err.message}`, 'text-error');
-      addTranscriptLine('SYS', 'Retrying without voice... Running text-only crawl.', 'text-on-surface-variant');
-
-      // Fallback: trigger the search phases manually via API
-      runFallbackCrawl(topic, sessionId);
+      console.error('[Agent] Voice start failed:', err);
+      addTranscriptLine('SYS', 'Voice unavailable — crawl continues without narration', 'text-on-surface-variant');
+      // Crawl is already running via startFrontendCrawl — no fallback needed
     }
   }
 
-  // ── Fallback: run crawl without agent voice ──
-  async function runFallbackCrawl(topic, sid) {
-    const phases = ['reviews', 'reddit', 'news', 'deep_dive', 'verdict'];
-    for (const phase of phases) {
-      try {
-        addTranscriptLine('CRAWL', `Searching ${phase}...`, 'text-primary');
-        const res = await fetch('/api/agent-search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ brand: topic, phase }),
-        });
-        const data = await res.json();
-        if (data.response) {
-          // Show a summary of what was found
-          const lines = data.response.split('\n').filter(l => l.startsWith('- "'));
-          lines.slice(0, 3).forEach(l => addTranscriptLine('', l.substring(0, 80), 'text-on-surface-variant opacity-70'));
-        }
-      } catch (e) {
-        addTranscriptLine('ERROR', `${phase}: ${e.message}`, 'text-error');
-      }
-    }
-  }
-
-  // ── SSE Connection (for visual crawl updates from backend webhook) ──
+  // ── SSE Connection ──
   function connectSSE(sid) {
     if (eventSource) eventSource.close();
     eventSource = new EventSource(`/api/stream/${sid}`);
 
     eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      handleSSE(data);
+      try {
+        const data = JSON.parse(event.data);
+        handleSSE(data);
+      } catch(e) {
+        console.error('[SSE] Parse error:', e);
+      }
     };
 
     eventSource.onerror = () => {
-      // Connection closed by server after complete
+      // Connection closed by server
     };
   }
 
-  // ── Handle SSE Events (backend → frontend visual updates) ──
+  // ── Handle SSE Events ──
   function handleSSE(data) {
     switch (data.type) {
       case 'connected':
@@ -650,6 +657,13 @@
         document.getElementById('heat-bar').style.width = heatEst + '%';
         break;
 
+      case 'phase_summary':
+        // Extra context from frontend-driven crawl — log sentiment
+        if (data.sentiment) {
+          addTranscriptLine('ANALYSIS', `${data.label} sentiment: ${data.sentiment}`, 'text-on-surface-variant');
+        }
+        break;
+
       case 'score_reveal':
         inVerdictPhase = true;
         addTranscriptLine('SCORE', `Vibe Score: ${data.score}/10 — ${data.mode.toUpperCase()}`, data.isRoast ? 'text-primary' : 'text-secondary');
@@ -660,29 +674,56 @@
         break;
 
       case 'complete':
-        // Store verdict data — use captured agent monologue as verdict text
-        data.verdict = agentMonologue || data.verdict || 'The agent has delivered the verdict.';
+        crawlComplete = true;
+        // Use agent monologue if available, otherwise generate verdict text
+        const verdictText = agentMonologue || generateVerdictText(data);
+        data.verdict = verdictText;
         verdictData = data;
         console.log('[Complete] Verdict data ready. Agent active:', !!agentConversation);
-        // Give agent 12s to finish speaking, then show verdict
-        // Agent might still be delivering the verdict monologue
+
+        // Show verdict after a short delay (give agent a chance to finish speaking)
+        const delay = agentConversation ? 8000 : 3000;
         setTimeout(() => {
           if (verdictData && document.getElementById('screen-crawl').classList.contains('active')) {
-            // Update verdict text with any additional agent speech captured
-            verdictData.verdict = agentMonologue || verdictData.verdict;
+            // Update with any agent monologue captured during delay
+            if (agentMonologue) verdictData.verdict = agentMonologue;
             showVerdictScreen(verdictData);
-            // End agent session after showing verdict
+            // End agent session
             if (agentConversation) {
               try { agentConversation.endSession(); } catch(e) {}
               agentConversation = null;
             }
           }
-        }, 12000);
+        }, delay);
         break;
 
       case 'error':
         addTranscriptLine('ERROR', data.message, 'text-error');
         break;
+    }
+  }
+
+  // ── Generate verdict text when agent isn't narrating ──
+  function generateVerdictText(data) {
+    const { topic, score, mode, stats, triggers } = data;
+    const isRoast = mode === 'roast';
+
+    if (isRoast) {
+      const roasts = [
+        `After crawling ${data.totalResults || 'dozens of'} sources, the internet has spoken: ${topic} is sitting at a rough ${score} out of 10.`,
+        `The data doesn't lie — ${stats?.negHits || 'multiple'} negative signals and ${stats?.controversyHits || 'some'} controversy flags paint a clear picture.`,
+        `Key issues: ${(triggers || []).join(', ') || 'general mediocrity'}.`,
+        `${topic} might want to have a serious conversation with its PR team.`
+      ];
+      return roasts.join(' ');
+    } else {
+      const hypes = [
+        `${data.totalResults || 'Dozens of'} sources analyzed and the verdict is clear: ${topic} is crushing it with a ${score} out of 10.`,
+        `${stats?.posHits || 'Multiple'} positive signals, genuine enthusiasm from the community, and real momentum.`,
+        `Standout strengths: ${(triggers || []).join(', ') || 'overall positive reception'}.`,
+        `${topic} is doing something right — the internet approves.`
+      ];
+      return hypes.join(' ');
     }
   }
 
@@ -751,10 +792,8 @@
     scoreBig.textContent = data.score + '/10';
     scoreBig.className = `font-black text-6xl md:text-8xl tracking-tighter score-reveal ${isRoast ? 'text-on-primary-container' : 'text-on-secondary'}`;
 
-    // Audio bar hidden — agent handles voice via ElevenLabs SDK
     document.getElementById('audio-bar').classList.add('hidden');
 
-    // Monologue
     const headlines = isRoast
       ? [`"The Aesthetic Equivalent of a Lukewarm Latte."`, `"Houston, We Have a Problem."`, `"Certified Not It."`, `"Internet Said No."`, `"Vibes? What Vibes?"`]
       : [`"This Is What Momentum Looks Like."`, `"The Internet Has Spoken: Fire."`, `"Certified Fresh."`, `"Main Character Energy."`, `"The Hype Is Real."`];
