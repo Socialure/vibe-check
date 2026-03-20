@@ -56,7 +56,6 @@
       color: #fff;
       font-family: 'Inter', sans-serif;
     }
-    /* Ambient glow effects */
     .glow-primary { box-shadow: 0 0 60px -10px rgba(255, 143, 111, 0.35); }
     .glow-secondary { box-shadow: 0 0 60px -10px rgba(193, 128, 255, 0.35); }
     .text-glow-primary { text-shadow: 0 0 30px rgba(255, 143, 111, 0.4); }
@@ -67,11 +66,9 @@
     .ambient-bloom-secondary {
       background: radial-gradient(circle, rgba(193, 128, 255, 0.12) 0%, transparent 70%);
     }
-    /* Scrollbar */
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #262626; border-radius: 10px; }
-    /* Smooth section transitions */
     .screen { display: none; }
     .screen.active { display: block; animation: fadeUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
     @keyframes fadeUp {
@@ -99,7 +96,6 @@
       to { opacity: 1; transform: scale(1); }
     }
     .score-reveal { animation: countUp 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-    /* Dot grid pattern */
     .dot-grid {
       background-image: radial-gradient(circle, #262626 1px, transparent 1px);
       background-size: 32px 32px;
@@ -108,7 +104,7 @@
 </head>
 <body class="min-h-screen overflow-x-hidden">
 
-<!-- ═══════════════ TOP NAV ═══════════════ -->
+<!-- TOP NAV -->
 <header class="sticky top-0 z-50 bg-surface-container flex justify-between items-center px-6 py-4">
   <div class="font-black tracking-tighter uppercase text-2xl text-primary">VIBE CHECK</div>
   <div class="flex items-center gap-6">
@@ -117,13 +113,11 @@
   </div>
 </header>
 
-<!-- ═══════════════ SCREEN 1: LANDING ═══════════════ -->
+<!-- SCREEN 1: LANDING -->
 <div id="screen-landing" class="screen active">
   <main class="relative min-h-[90vh] flex flex-col items-center justify-center text-center px-6">
-    <!-- Ambient background -->
     <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/15 rounded-full blur-[120px] -z-10"></div>
 
-    <!-- Central Motif -->
     <div class="relative mb-12">
       <div class="w-56 h-56 md:w-80 md:h-80 rounded-full border-[10px] border-primary-container/20 flex items-center justify-center glow-primary bg-surface-container-low/40 backdrop-blur-xl relative overflow-hidden">
         <div class="absolute inset-0 bg-gradient-to-tr from-primary/10 to-transparent"></div>
@@ -131,7 +125,6 @@
       </div>
     </div>
 
-    <!-- Title -->
     <h1 class="text-5xl md:text-8xl font-black tracking-tighter uppercase mb-4 leading-none">
       <span class="text-primary">VIBE</span> <span class="text-secondary">CHECK</span>
     </h1>
@@ -139,7 +132,6 @@
       The radical editorial lens for your digital presence. Precise, Swiss-inspired, and brutally honest.
     </p>
 
-    <!-- Search Bar -->
     <div class="w-full max-w-2xl">
       <div class="relative flex items-center bg-surface-container-highest rounded-full px-6 py-4 border border-outline-variant/10 focus-within:border-primary/50 transition-all">
         <span class="material-symbols-outlined text-on-surface-variant mr-4">search</span>
@@ -161,7 +153,6 @@
     </div>
   </main>
 
-  <!-- Bento How It Works -->
   <section class="px-6 py-16 max-w-6xl mx-auto">
     <div class="grid grid-cols-1 md:grid-cols-12 gap-5">
       <div class="md:col-span-8 bg-surface-container rounded-xl p-8 flex flex-col justify-between min-h-[280px] relative overflow-hidden group">
@@ -209,11 +200,10 @@
   </footer>
 </div>
 
-<!-- ═══════════════ SCREEN 2: LIVE CRAWL ═══════════════ -->
+<!-- SCREEN 2: LIVE CRAWL -->
 <div id="screen-crawl" class="screen">
   <main class="min-h-[90vh] flex flex-col items-center pt-8 pb-24 px-6 max-w-7xl mx-auto w-full">
 
-    <!-- Status Header -->
     <section class="w-full grid grid-cols-1 md:grid-cols-12 gap-6 mb-12 items-end">
       <div class="md:col-span-8">
         <div class="flex items-center gap-3 mb-3">
@@ -224,21 +214,19 @@
           <span class="text-[10px] font-bold tracking-[0.2em] text-primary uppercase">LIVE CRAWL ACTIVE</span>
         </div>
         <h1 class="text-4xl md:text-6xl font-black tracking-tighter uppercase leading-[0.9]">
-          SEARCHING LIVE INTERNET<br/>
-          <span class="text-secondary">FOR LATEST BUZZ</span>
+          VIBE CHECKING<br/>
+          <span class="text-secondary" id="crawl-topic-display">...</span>
         </h1>
       </div>
       <div class="md:col-span-4 flex flex-col items-start md:items-end">
         <p id="crawl-status-text" class="text-on-surface-variant text-sm font-medium leading-relaxed max-w-xs md:text-right">
-          Our neural agents are dissecting social sentiment, market trends, and underground forums to calculate the Vibe Index.
+          Crawling the internet for reviews, opinions, news, and social buzz. Voice narration is live.
         </p>
       </div>
     </section>
 
-    <!-- Central Pulse -->
     <section class="relative w-full aspect-video flex items-center justify-center mb-12 overflow-hidden rounded-xl bg-surface-container-low">
       <div class="absolute inset-0 opacity-10 pointer-events-none dot-grid"></div>
-      <!-- Speaker indicator -->
       <div id="speaker-indicator" class="relative z-10 w-48 h-48 md:w-64 md:h-64 rounded-full flex items-center justify-center border-2 border-primary/20 bg-surface-container-high glow-primary transition-all duration-500">
         <div class="absolute inset-0 rounded-full bg-primary/5 animate-pulse"></div>
         <div class="flex flex-col items-center text-center">
@@ -247,7 +235,6 @@
           <div class="text-on-surface-variant text-[10px] font-bold tracking-widest uppercase mt-1">SYNERGY</div>
         </div>
       </div>
-      <!-- Floating nodes -->
       <div id="node-left" class="absolute top-1/4 left-[15%] p-3 bg-surface-container-highest rounded-lg border-l-4 border-secondary glow-secondary hidden md:block opacity-0 transition-opacity duration-700">
         <div class="text-[8px] font-bold text-secondary uppercase mb-1">Incoming Data</div>
         <div id="node-left-text" class="text-[10px] text-on-surface truncate max-w-[140px]">Waiting...</div>
@@ -258,9 +245,7 @@
       </div>
     </section>
 
-    <!-- Bento: Transcript + Metrics -->
     <div class="w-full grid grid-cols-1 lg:grid-cols-3 gap-5">
-      <!-- Live Transcript -->
       <div class="lg:col-span-2 bg-surface-container-low rounded-xl p-5 relative overflow-hidden">
         <div class="flex justify-between items-center mb-4">
           <div class="flex items-center gap-2">
@@ -278,7 +263,6 @@
         <div class="absolute bottom-0 left-0 w-full h-10 bg-gradient-to-t from-surface-container-low to-transparent pointer-events-none"></div>
       </div>
 
-      <!-- Side Metrics -->
       <div class="space-y-5">
         <div class="bg-surface-container p-5 rounded-xl">
           <div class="flex justify-between items-start mb-3">
@@ -310,14 +294,12 @@
   </main>
 </div>
 
-<!-- ═══════════════ SCREEN 3: VERDICT ═══════════════ -->
+<!-- SCREEN 3: VERDICT -->
 <div id="screen-verdict" class="screen">
   <main class="min-h-[90vh] flex flex-col items-center pt-8 pb-32 overflow-x-hidden">
 
-    <!-- Ambient glow (set by JS) -->
     <div id="verdict-ambient" class="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full -z-10 pointer-events-none"></div>
 
-    <!-- Big Bold Header -->
     <section id="verdict-hero" class="w-full max-w-7xl px-6 flex flex-col items-center md:items-start text-center md:text-left mb-12">
       <div class="inline-flex items-center gap-4 mb-4">
         <span class="h-[2px] w-12" id="verdict-line"></span>
@@ -327,7 +309,6 @@
       <div id="verdict-subtitle" class="mt-3 flex flex-wrap gap-3 font-black text-3xl md:text-5xl text-on-surface uppercase opacity-20"></div>
     </section>
 
-    <!-- Central Motif -->
     <section class="relative w-full flex justify-center items-center py-12 px-6">
       <div class="relative w-56 h-56 md:w-80 md:h-80">
         <div id="verdict-ring-1" class="absolute inset-0 rounded-full border scale-125" style="animation: pulseRing 3s ease-in-out infinite;"></div>
@@ -341,7 +322,6 @@
       </div>
     </section>
 
-    <!-- Audio Player Bar -->
     <section id="audio-bar" class="w-full max-w-3xl px-6 mb-12 hidden">
       <div class="bg-surface-container rounded-full px-5 py-3 flex items-center gap-4">
         <button id="verdict-play-btn" onclick="toggleVerdictAudio()" class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all">
@@ -356,9 +336,7 @@
       </div>
     </section>
 
-    <!-- Monologue + Stats -->
     <section class="w-full max-w-5xl px-6 grid grid-cols-1 md:grid-cols-12 gap-6 mt-4">
-      <!-- Main Monologue -->
       <div class="md:col-span-8 bg-surface-container rounded-xl p-8 md:p-10 relative overflow-hidden">
         <div class="absolute top-0 right-0 p-4">
           <span class="material-symbols-outlined text-on-surface/10 text-5xl">format_quote</span>
@@ -377,7 +355,6 @@
         </div>
       </div>
 
-      <!-- Side Stats -->
       <div class="md:col-span-4 space-y-6">
         <div class="bg-surface-container-low p-6 rounded-xl flex flex-col justify-center">
           <p class="text-[10px] uppercase tracking-[0.3em] text-on-surface-variant mb-3" id="deficiency-label">Hype Index</p>
@@ -391,24 +368,21 @@
       </div>
     </section>
 
-    <!-- Actions -->
     <section class="mt-12 px-6 flex flex-col items-center gap-4">
       <button id="share-btn" onclick="shareOnX()" class="font-black text-lg px-10 py-4 rounded-full hover:scale-105 active:scale-95 transition-all uppercase tracking-tight flex items-center gap-3">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
         Share on X
       </button>
       <button onclick="resetToLanding()" class="text-[10px] font-bold tracking-[0.2em] text-on-surface-variant uppercase cursor-pointer hover:text-on-surface transition-colors">
-        ↻ New Vibe Check
+        New Vibe Check
       </button>
     </section>
 
-    <!-- Sources -->
     <section class="w-full max-w-5xl px-6 mt-10">
       <button onclick="toggleSources()" class="text-[10px] font-bold tracking-[0.15em] text-on-surface-variant uppercase cursor-pointer hover:text-on-surface transition-colors mb-2">
-        ▸ Sources (<span id="verdict-source-count">0</span>)
+        Sources (<span id="verdict-source-count">0</span>)
       </button>
-      <div id="verdict-sources" class="hidden flex-col gap-1 mt-2">
-      </div>
+      <div id="verdict-sources" class="hidden flex-col gap-1 mt-2"></div>
     </section>
 
     <footer class="mt-16 py-8 text-center w-full">
@@ -421,7 +395,7 @@
   </main>
 </div>
 
-<!-- ═══════════════ JAVASCRIPT ═══════════════ -->
+<!-- JAVASCRIPT -->
 <script>
   let sessionId = null;
   let eventSource = null;
@@ -431,6 +405,22 @@
   let verdictData = null;
   let totalSourcesFound = 0;
   let crawlStartTime = null;
+  let verdictAudioB64 = null;
+  let currentTopic = '';
+
+  // AudioContext — created on first user click to unlock browser audio
+  let audioCtx = null;
+
+  function ensureAudioContext() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      console.log('[Audio] AudioContext created, state:', audioCtx.state);
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+      console.log('[Audio] AudioContext resumed');
+    }
+  }
 
   // ── Screen Management ──
   function showScreen(name) {
@@ -446,6 +436,7 @@
     isPlaying = false;
     totalSourcesFound = 0;
     verdictData = null;
+    verdictAudioB64 = null;
     showScreen('landing');
     document.getElementById('topic-input').value = '';
     document.getElementById('topic-input').focus();
@@ -462,11 +453,17 @@
     const topic = input.value.trim();
     if (!topic) return;
 
+    // CRITICAL: Unlock audio on user gesture
+    ensureAudioContext();
+
+    currentTopic = topic;
     sessionId = crypto.randomUUID();
     crawlStartTime = Date.now();
     totalSourcesFound = 0;
     audioQueue = [];
     isPlaying = false;
+    verdictAudioB64 = null;
+    verdictData = null;
 
     // Reset crawl screen
     document.getElementById('transcript-feed').innerHTML = '';
@@ -478,6 +475,7 @@
     document.getElementById('synergy-pct').textContent = '0%';
     document.getElementById('node-left').style.opacity = '0';
     document.getElementById('node-right').style.opacity = '0';
+    document.getElementById('crawl-topic-display').textContent = topic.toUpperCase();
 
     showScreen('crawl');
 
@@ -529,12 +527,10 @@
         addTranscriptLine(data.label.includes('Reddit') ? 'FORUM' : data.label.includes('News') ? 'NEWS' : 'CRAWL',
           `${data.label}: ${data.count} results found`, 'text-secondary');
         if (data.titles) {
-          data.titles.forEach(t => addTranscriptLine('', `  → ${t}`, 'text-on-surface-variant opacity-70'));
+          data.titles.forEach(t => addTranscriptLine('', `  ${t}`, 'text-on-surface-variant opacity-70'));
         }
-        // Update nodes
         document.getElementById('node-left').style.opacity = '1';
         document.getElementById('node-left-text').textContent = data.label;
-        // Update heat estimate
         const heatEst = Math.min(95, Math.round((totalSourcesFound / 25) * 100));
         document.getElementById('heat-value').textContent = heatEst;
         document.getElementById('heat-bar').style.width = heatEst + '%';
@@ -545,7 +541,11 @@
         break;
 
       case 'audio':
-        audioQueue.push(data.audio);
+        console.log('[Audio] Received audio clip for phase:', data.phase, '| queue length:', audioQueue.length);
+        if (data.phase === 'verdict') {
+          verdictAudioB64 = data.audio;
+        }
+        audioQueue.push({ audio: data.audio, phase: data.phase });
         if (!isPlaying) playNextAudio();
         break;
 
@@ -559,11 +559,11 @@
 
       case 'complete':
         verdictData = data;
+        console.log('[Complete] Audio queue:', audioQueue.length, 'isPlaying:', isPlaying);
         // Wait for audio queue to finish, then show verdict
         if (audioQueue.length === 0 && !isPlaying) {
-          showVerdictScreen(data);
+          setTimeout(() => showVerdictScreen(data), 1500);
         }
-        // Otherwise, showVerdictScreen is called when audio finishes
         break;
 
       case 'error':
@@ -578,7 +578,6 @@
     const pct = phases[phase] || 0;
     document.getElementById('synergy-pct').textContent = pct + '%';
 
-    // Update confidence
     if (pct > 50) {
       document.getElementById('confidence-value').textContent = 'MEDIUM';
       document.getElementById('confidence-text').textContent = 'Building pattern confidence...';
@@ -605,58 +604,90 @@
     feed.scrollTop = feed.scrollHeight;
   }
 
-  // ── Audio Queue Playback ──
-  function playNextAudio() {
+  // ── Audio Playback via AudioContext (browser-compatible) ──
+  async function playNextAudio() {
     if (audioQueue.length === 0) {
       isPlaying = false;
       document.getElementById('speaker-indicator').classList.remove('speaker-active');
+      document.getElementById('pulse-icon').textContent = 'sensors';
+      console.log('[Audio] Queue empty, isPlaying = false');
       // If verdict data is ready, show verdict screen
       if (verdictData) {
-        setTimeout(() => showVerdictScreen(verdictData), 800);
+        setTimeout(() => showVerdictScreen(verdictData), 1200);
       }
       return;
     }
 
     isPlaying = true;
-    const base64 = audioQueue.shift();
-    currentAudio = new Audio(`data:audio/mpeg;base64,${base64}`);
+    const item = audioQueue.shift();
+    const base64 = item.audio;
+    const phase = item.phase;
 
-    // Visual feedback
+    console.log('[Audio] Playing clip for phase:', phase, '| remaining in queue:', audioQueue.length);
+
+    // Visual feedback — show speaking state
     document.getElementById('speaker-indicator').classList.add('speaker-active');
     document.getElementById('pulse-icon').textContent = 'graphic_eq';
 
-    currentAudio.addEventListener('ended', () => {
-      document.getElementById('pulse-icon').textContent = 'sensors';
-      playNextAudio();
-    });
+    try {
+      // Decode base64 to ArrayBuffer
+      const binaryStr = atob(base64);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
 
-    currentAudio.addEventListener('error', () => {
-      playNextAudio();
-    });
+      // Use AudioContext to decode and play (bypasses autoplay restrictions since ctx was created on user gesture)
+      ensureAudioContext();
+      const audioBuffer = await audioCtx.decodeAudioData(bytes.buffer.slice(0));
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioCtx.destination);
 
-    currentAudio.play().catch(() => playNextAudio());
+      source.onended = () => {
+        console.log('[Audio] Clip ended for phase:', phase);
+        document.getElementById('pulse-icon').textContent = 'sensors';
+        playNextAudio();
+      };
+
+      source.start(0);
+      console.log('[Audio] Playing! Duration:', audioBuffer.duration.toFixed(1), 's');
+    } catch (err) {
+      console.error('[Audio] Playback error:', err);
+      // Fallback: try HTML5 Audio element
+      try {
+        currentAudio = new Audio(`data:audio/mpeg;base64,${base64}`);
+        currentAudio.addEventListener('ended', () => {
+          document.getElementById('pulse-icon').textContent = 'sensors';
+          playNextAudio();
+        });
+        currentAudio.addEventListener('error', () => {
+          console.error('[Audio] HTML5 Audio fallback also failed');
+          playNextAudio();
+        });
+        await currentAudio.play();
+        console.log('[Audio] HTML5 Audio fallback playing');
+      } catch (e2) {
+        console.error('[Audio] All playback methods failed:', e2);
+        playNextAudio();
+      }
+    }
   }
 
   // ── Show Verdict Screen ──
   function showVerdictScreen(data) {
     const isRoast = data.mode === 'roast';
-
-    // Colors
-    const mainColor = isRoast ? '#ff8f6f' : '#c180ff';
     const accentClass = isRoast ? 'text-primary' : 'text-secondary';
     const bgClass = isRoast ? 'bg-primary' : 'bg-secondary';
 
-    // Ambient
     document.getElementById('verdict-ambient').className =
       `absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full -z-10 pointer-events-none ${isRoast ? 'ambient-bloom-primary' : 'ambient-bloom-secondary'}`;
 
-    // Title
     document.getElementById('verdict-line').className = `h-[2px] w-12 ${bgClass}`;
     const title = document.getElementById('verdict-title');
     title.textContent = isRoast ? 'ROAST' : 'HYPE';
     title.className = `font-black text-7xl md:text-[10rem] leading-[0.85] tracking-tighter uppercase ${accentClass} ${isRoast ? 'text-glow-primary' : 'text-glow-secondary'}`;
 
-    // Subtitle
     const subtitles = isRoast
       ? ['IDENTITY', 'REVOKED', 'SYSTEMS', 'OVERHEAT']
       : ['ULTRA', 'REVEAL', 'MAXIMUM', 'ENERGY'];
@@ -665,7 +696,6 @@
     ).join('');
     document.getElementById('verdict-subtitle').innerHTML = subtitleHtml;
 
-    // Score circle
     const circle = document.getElementById('verdict-circle');
     circle.className = `absolute inset-0 rounded-full flex items-center justify-center overflow-hidden ${isRoast ? 'bg-gradient-to-tr from-primary-fixed-dim via-primary to-secondary' : 'bg-gradient-to-br from-secondary to-secondary-container'}`;
     circle.style.boxShadow = `0 0 80px ${isRoast ? 'rgba(255,93,43,0.4)' : 'rgba(193,128,255,0.4)'}`;
@@ -694,7 +724,6 @@
     document.getElementById('verdict-headline').className = `font-bold text-xl mb-4 uppercase tracking-tight italic ${isRoast ? 'text-primary-fixed-dim' : 'text-secondary'}`;
     document.getElementById('verdict-monologue').textContent = data.verdict;
 
-    // Severity
     const severities = isRoast
       ? { 1: 'CATASTROPHIC', 2: 'CRITICAL', 3: 'SEVERE', 4: 'MODERATE', 5: 'MILD' }
       : { 6: 'PROMISING', 7: 'STRONG', 8: 'ELITE', 9: 'LEGENDARY', 10: 'MYTHIC' };
@@ -702,20 +731,17 @@
     document.getElementById('severity-value').textContent = severities[data.score] || (isRoast ? 'MODERATE' : 'STRONG');
     document.getElementById('severity-value').className = `font-black text-lg uppercase ${accentClass}`;
 
-    // Live badge
     const badge = document.getElementById('live-badge');
     badge.className = `px-4 py-2 rounded-full flex items-center gap-2 ${isRoast ? 'bg-primary/10' : 'bg-secondary/10'}`;
     badge.querySelector('span:first-child').className = `w-2 h-2 rounded-full animate-ping ${bgClass}`;
     document.getElementById('live-badge-text').className = `font-label text-xs font-bold uppercase ${accentClass}`;
     document.getElementById('live-badge-text').textContent = isRoast ? 'Live Burn' : 'Live Hype';
 
-    // Deficiency stat
     document.getElementById('deficiency-label').textContent = isRoast ? 'Hype Deficiency' : 'Hype Surplus';
     document.getElementById('deficiency-value').textContent = (data.hypeDeficiency > 0 ? '+' : '') + data.hypeDeficiency + '%';
     document.getElementById('deficiency-value').className = `font-black text-5xl ${accentClass}`;
     document.getElementById('deficiency-desc').textContent = isRoast ? 'Relative to industry standard "Edge"' : 'Above baseline expectations';
 
-    // Triggers
     const triggersList = document.getElementById('triggers-list');
     document.getElementById('triggers-label').textContent = isRoast ? 'Top Cringe Triggers' : 'Key Strengths';
     document.getElementById('triggers-card').className = `bg-surface-container-highest p-6 rounded-xl ${isRoast ? 'border-l-4 border-primary' : 'border-l-4 border-secondary'}`;
@@ -726,12 +752,10 @@
       </li>
     `).join('');
 
-    // Share button
     const shareBtn = document.getElementById('share-btn');
     shareBtn.className = `font-black text-lg px-10 py-4 rounded-full hover:scale-105 active:scale-95 transition-all uppercase tracking-tight flex items-center gap-3 ${isRoast ? 'bg-primary-container text-on-primary-container' : 'bg-secondary-container text-on-secondary-container'}`;
     shareBtn.style.boxShadow = `0 20px 40px ${isRoast ? 'rgba(255,143,111,0.3)' : 'rgba(193,128,255,0.3)'}`;
 
-    // Sources
     if (data.sources?.length) {
       document.getElementById('verdict-source-count').textContent = data.sources.length;
       document.getElementById('verdict-sources').innerHTML = data.sources.map(s =>
@@ -741,18 +765,6 @@
 
     showScreen('verdict');
   }
-
-  // ── Verdict audio storage ──
-  let verdictAudioB64 = null;
-
-  // Override handleSSE audio for verdict phase
-  const _origHandleSSE = handleSSE;
-  handleSSE = function(data) {
-    if (data.type === 'audio' && data.phase === 'verdict') {
-      verdictAudioB64 = data.audio;
-    }
-    _origHandleSSE(data);
-  };
 
   // ── Toggle verdict audio ──
   function toggleVerdictAudio() {
@@ -792,13 +804,12 @@
     const { topic, score, mode } = verdictData;
     const emoji = mode === 'roast' ? '🔥' : '✨';
     const label = mode === 'roast' ? 'Roast' : 'Hype';
-    const text = `${emoji} ${topic} got a ${score}/10 ${label} Score on Vibe Check!\n\nAI crawled the entire internet and delivered the verdict.\n\nGet your brand checked 👇`;
+    const text = `${emoji} ${topic} got a ${score}/10 ${label} Score on Vibe Check!\n\nAI crawled the entire internet and delivered the verdict.\n\nGet your brand checked`;
     const url = window.location.origin;
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'width=600,height=400');
   }
   window.shareOnX = shareOnX;
 
-  // ── Toggle Sources ──
   function toggleSources() {
     const el = document.getElementById('verdict-sources');
     el.classList.toggle('hidden');

@@ -40,7 +40,8 @@ function emit(sessionId, event) {
 // ── Firecrawl Search ─────────────────────────────────────────────────
 async function firecrawlSearch(query, limit = 5) {
   try {
-    const res = await fetch('https://api.firecrawl.dev/v2/search', {
+    console.log(`  🔍 Firecrawl query: "${query}"`);
+    const res = await fetch('https://api.firecrawl.dev/v1/search', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -49,26 +50,31 @@ async function firecrawlSearch(query, limit = 5) {
       body: JSON.stringify({
         query,
         limit,
-        tbs: 'qdr:m',
         scrapeOptions: { formats: ['markdown'], onlyMainContent: true, timeout: 15000 },
       }),
     });
     if (!res.ok) {
-      console.error(`Firecrawl ${res.status} for: ${query}`);
+      const errText = await res.text().catch(() => '');
+      console.error(`  ❌ Firecrawl ${res.status}: ${errText.substring(0, 200)}`);
       return [];
     }
     const data = await res.json();
-    return data.data?.web || data.data || [];
+    console.log(`  ✅ Firecrawl returned ${(data.data || []).length} results`);
+    return data.data || [];
   } catch (e) {
-    console.error('Firecrawl error:', e.message);
+    console.error('  ❌ Firecrawl error:', e.message);
     return [];
   }
 }
 
 // ── ElevenLabs TTS ───────────────────────────────────────────────────
 async function generateSpeech(text) {
-  if (!ELEVENLABS_API_KEY) return null;
+  if (!ELEVENLABS_API_KEY) {
+    console.log('  ⚠️  No ElevenLabs key — skipping TTS');
+    return null;
+  }
   try {
+    console.log(`  🎙️  TTS generating (${text.length} chars)...`);
     const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
       method: 'POST',
       headers: {
@@ -87,19 +93,20 @@ async function generateSpeech(text) {
       }),
     });
     if (!res.ok) {
-      console.error('TTS error:', res.status);
+      const errText = await res.text().catch(() => '');
+      console.error(`  ❌ TTS ${res.status}: ${errText.substring(0, 200)}`);
       return null;
     }
     const buf = await res.arrayBuffer();
+    console.log(`  ✅ TTS generated (${buf.byteLength} bytes)`);
     return Buffer.from(buf).toString('base64');
   } catch (e) {
-    console.error('TTS error:', e.message);
+    console.error('  ❌ TTS error:', e.message);
     return null;
   }
 }
 
 // ── Vibe Score Formula ───────────────────────────────────────────────
-// Designed to NOT give everything 10/10. Starts at 5, moves based on evidence.
 function calculateVibeScore(allResults) {
   const text = allResults
     .map(r => `${r.title || ''} ${r.description || ''} ${(r.markdown || '').substring(0, 600)}`)
@@ -143,39 +150,26 @@ function calculateVibeScore(allResults) {
   controversyWords.forEach(w => { if (text.includes(w)) controversyHits++; });
   enthusiasmWords.forEach(w => { if (text.includes(w)) enthusiasmHits++; });
 
-  // Diminishing returns on positives (anti-marketing-spam)
   const effectivePos = Math.min(posHits, 8) * 0.3 + Math.max(0, posHits - 8) * 0.03;
-  const effectiveNeg = negHits * 0.45; // Negatives weigh more
+  const effectiveNeg = negHits * 0.45;
 
-  let score = 5; // Start neutral
+  let score = 5;
   score += effectivePos;
   score -= effectiveNeg;
-  score -= controversyHits * 1.3; // Controversy hits hard
+  score -= controversyHits * 1.3;
   score += enthusiasmHits * 0.5;
-
-  // Noise factor for variety (±0.75)
   score += (Math.random() - 0.5) * 1.5;
 
-  // Obscurity penalty
   if (allResults.length < 4) score -= 1.5;
   if (allResults.length < 2) score -= 1.0;
 
   score = Math.max(1, Math.min(10, Math.round(score)));
 
-  // Compute hype deficiency / surplus for display
   const hypeDeficiency = score <= 5
     ? -Math.round((1 - score / 10) * 100)
     : Math.round((score / 10) * 100);
 
-  return {
-    score,
-    posHits,
-    negHits,
-    controversyHits,
-    enthusiasmHits,
-    isRoast: score <= 5,
-    hypeDeficiency,
-  };
+  return { score, posHits, negHits, controversyHits, enthusiasmHits, isRoast: score <= 5, hypeDeficiency };
 }
 
 // ── Narration Generator ──────────────────────────────────────────────
@@ -192,34 +186,34 @@ function makeNarration(phase, topic, results, analysis) {
       ]);
 
     case 'reviews':
-      if (results.length === 0) return `Hmm, I'm pulling up reviews for ${topic} and... there's barely anything here. When the internet doesn't have opinions, that's usually not a great sign. Let me keep digging.`;
+      if (results.length === 0) return `Hmm, I'm pulling up reviews for ${topic} and there's barely anything here. When the internet doesn't have opinions, that's usually not a great sign. Let me keep digging though.`;
       return pick([
-        `First up, reviews. I found ${results.length} results. ${topTitles}. Let me scan through these and see what the consensus is.`,
-        `OK so the review landscape for ${topic}. Found ${results.length} articles including ${topTitles}. Interesting. Let me read between the lines here.`,
+        `First up, reviews. I found ${results.length} results including ${topTitles}. Let me scan through these and see what the consensus is. Some interesting stuff here already.`,
+        `OK so the review landscape for ${topic}. Found ${results.length} articles including ${topTitles}. Interesting. Let me read between the lines here and see what people are really saying.`,
       ]);
 
     case 'opinions': {
-      if (results.length === 0) return `Reddit and the forums are dead silent on ${topic}. When the internet doesn't care enough to argue about something, that tells you a lot.`;
+      if (results.length === 0) return `Reddit and the forums are dead silent on ${topic}. When the internet doesn't care enough to argue about something, that tells you a lot. Moving on to the news.`;
       const hasNeg = results.some(r => (r.markdown || '').toLowerCase().match(/hate|awful|terrible|worst|scam|trash|sucks/));
       const hasPos = results.some(r => (r.markdown || '').toLowerCase().match(/love|amazing|best|incredible|awesome|obsessed/));
-      if (hasNeg && hasPos) return `Now Reddit and the forums. This is where it gets interesting. People are DIVIDED on ${topic}. Some absolutely love it, others are tearing it apart. This is the kind of drama I live for.`;
-      if (hasNeg) return `OK so Reddit and the forums... and wow. People are NOT happy with ${topic}. I'm seeing some seriously negative takes here. The complaints are stacking up. This is going to hurt the score.`;
-      if (hasPos) return `Checking Reddit and the forums now. And people are actually pretty positive about ${topic}! I'm seeing genuine enthusiasm, not just marketing fluff. That's a good sign.`;
-      return `Reddit has ${results.length} threads about ${topic}. Mixed vibes so far. Some fans, some skeptics. Let me factor this in.`;
+      if (hasNeg && hasPos) return `Now Reddit and the forums. This is where it gets interesting. People are DIVIDED on ${topic}. Some absolutely love it, others are tearing it apart. Found ${results.length} discussion threads. This is the kind of drama I live for. Let me factor all of this in.`;
+      if (hasNeg) return `OK so Reddit and the forums. And wow. People are NOT happy with ${topic}. I'm seeing some seriously negative takes here across ${results.length} threads. The complaints are stacking up. This is going to hurt the score for sure.`;
+      if (hasPos) return `Checking Reddit and the forums now. And people are actually pretty positive about ${topic}! I found ${results.length} threads with genuine enthusiasm, not just marketing fluff. That's a really good sign actually.`;
+      return `Reddit has ${results.length} threads about ${topic}. Mixed vibes so far. Some fans, some skeptics. Let me factor this into the analysis and keep going.`;
     }
 
     case 'news': {
       const hasDrama = results.some(r =>
         (r.title || '').toLowerCase().match(/scandal|controversy|lawsuit|fired|layoff|breach|protest|backlash/)
       );
-      if (hasDrama) return `Oh oh oh. The news has DRAMA. I'm seeing controversy, headlines that are NOT flattering. This is definitely going to tank the vibe score. Let me calculate the damage.`;
-      if (results.length === 0) return `Checking the news cycle for ${topic}. It's quiet. No drama, but also no buzz. Sometimes the absence of news IS the news.`;
-      return `Latest news on ${topic}. Found ${results.length} articles. No major scandals, which is a plus. Let me wrap this all up into a final verdict.`;
+      if (hasDrama) return `Oh oh oh. The news has DRAMA. I'm seeing controversy, headlines that are NOT flattering for ${topic}. This is definitely going to tank the vibe score. Let me dig deeper and see how bad this really is.`;
+      if (results.length === 0) return `Checking the news cycle for ${topic}. It's quiet. No drama, but also no buzz. Sometimes the absence of news IS the news. Let me do one more deep scan before the verdict.`;
+      return `Latest news on ${topic}. Found ${results.length} articles. The news coverage is looking ${results.length > 3 ? 'pretty active' : 'relatively quiet'}. No major scandals, which is a plus. Almost ready for the final analysis now.`;
     }
 
     case 'deep_dive': {
-      if (results.length === 0) return `One final deep scan and I'm not finding much more. OK, I think I have enough data. Let me crunch the numbers.`;
-      return `One more pass, going deeper. Found ${results.length} more data points. I'm looking at trends, social media mentions, the whole picture. Almost ready for the verdict.`;
+      if (results.length === 0) return `One final deep scan across social media and I'm not finding much more on ${topic}. OK, I think I have enough data now. Let me crunch all the numbers and calculate the final vibe score.`;
+      return `One last pass, going deeper into social media for ${topic}. Found ${results.length} more data points. I'm looking at trends, mentions, the whole picture. This is where I finalize my assessment. Give me a second to calculate everything.`;
     }
 
     case 'verdict_roast': {
@@ -296,6 +290,9 @@ function extractTriggers(allResults, isRoast) {
   }
 }
 
+// ── Utility: wait ────────────────────────────────────────────────────
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
 // ── Main Vibe Check (async pipeline) ─────────────────────────────────
 app.post('/api/vibe-check', async (req, res) => {
   const { topic, sessionId } = req.body;
@@ -304,7 +301,6 @@ app.post('/api/vibe-check', async (req, res) => {
   console.log(`\n🎯 Vibe Check: "${topic}" (session: ${sessionId})`);
   res.json({ sessionId, status: 'started' });
 
-  // Run async — don't block the response
   runVibeCheck(topic, sessionId).catch(err => {
     console.error('❌ Vibe Check error:', err);
     emit(sessionId, { type: 'error', message: err.message });
@@ -315,64 +311,109 @@ async function runVibeCheck(topic, sessionId) {
   const allResults = [];
   const startTime = Date.now();
 
-  // ── Phase 1: Opening ──
-  emit(sessionId, { type: 'phase', phase: 'opening', message: 'Initializing Vibe Check...' });
+  // Use the exact topic for searches — quote it to prevent partial matching
+  const quotedTopic = `"${topic}"`;
+
+  // ── Phase 1: Opening narration ──
+  emit(sessionId, { type: 'phase', phase: 'opening', message: `Initializing Vibe Check for "${topic}"...` });
   const openingText = makeNarration('opening', topic, [], null);
   emit(sessionId, { type: 'narration', text: openingText, phase: 'opening' });
   const openingAudio = await generateSpeech(openingText);
-  if (openingAudio) emit(sessionId, { type: 'audio', audio: openingAudio, phase: 'opening' });
+  if (openingAudio) {
+    emit(sessionId, { type: 'audio', audio: openingAudio, phase: 'opening' });
+    // Wait for approximate audio duration so client can play it
+    // ~150 words per minute for TTS, ~0.8s per word, rough estimate
+    const wordCount = openingText.split(/\s+/).length;
+    const estimatedDuration = Math.max(4000, wordCount * 400);
+    console.log(`  ⏳ Waiting ${estimatedDuration}ms for opening narration (${wordCount} words)`);
+    await wait(estimatedDuration);
+  }
 
   // ── Phase 2: Reviews ──
-  emit(sessionId, { type: 'phase', phase: 'reviews', message: 'Scanning reviews & coverage...' });
-  const reviews = await firecrawlSearch(`${topic} review opinion 2025 2026`, 5);
+  emit(sessionId, { type: 'phase', phase: 'reviews', message: `Scanning reviews for "${topic}"...` });
+  const reviews = await firecrawlSearch(`${quotedTopic} review opinion latest`, 5);
   allResults.push(...reviews);
   emit(sessionId, {
     type: 'search_done', label: 'Reviews & Coverage', count: reviews.length,
     titles: reviews.slice(0, 4).map(r => r.title || r.url || 'Untitled'),
   });
+  // Small pause to let results render
+  await wait(1500);
   const reviewText = makeNarration('reviews', topic, reviews, null);
   emit(sessionId, { type: 'narration', text: reviewText, phase: 'reviews' });
   const reviewAudio = await generateSpeech(reviewText);
-  if (reviewAudio) emit(sessionId, { type: 'audio', audio: reviewAudio, phase: 'reviews' });
+  if (reviewAudio) {
+    emit(sessionId, { type: 'audio', audio: reviewAudio, phase: 'reviews' });
+    const wordCount = reviewText.split(/\s+/).length;
+    const estimatedDuration = Math.max(4000, wordCount * 400);
+    console.log(`  ⏳ Waiting ${estimatedDuration}ms for reviews narration (${wordCount} words)`);
+    await wait(estimatedDuration);
+  }
 
   // ── Phase 3: Reddit & Opinions ──
   emit(sessionId, { type: 'phase', phase: 'opinions', message: 'Crawling Reddit & forums...' });
-  const opinions = await firecrawlSearch(`${topic} reddit think opinion honest`, 5);
+  const opinions = await firecrawlSearch(`${quotedTopic} reddit think opinion honest review`, 5);
   allResults.push(...opinions);
   emit(sessionId, {
     type: 'search_done', label: 'Reddit & Forums', count: opinions.length,
     titles: opinions.slice(0, 4).map(r => r.title || r.url || 'Untitled'),
   });
+  await wait(1500);
   const opinionText = makeNarration('opinions', topic, opinions, null);
   emit(sessionId, { type: 'narration', text: opinionText, phase: 'opinions' });
   const opinionAudio = await generateSpeech(opinionText);
-  if (opinionAudio) emit(sessionId, { type: 'audio', audio: opinionAudio, phase: 'opinions' });
+  if (opinionAudio) {
+    emit(sessionId, { type: 'audio', audio: opinionAudio, phase: 'opinions' });
+    const wordCount = opinionText.split(/\s+/).length;
+    const estimatedDuration = Math.max(4000, wordCount * 400);
+    console.log(`  ⏳ Waiting ${estimatedDuration}ms for opinions narration (${wordCount} words)`);
+    await wait(estimatedDuration);
+  }
 
   // ── Phase 4: News & Controversy ──
   emit(sessionId, { type: 'phase', phase: 'news', message: 'Checking news & controversy...' });
-  const news = await firecrawlSearch(`${topic} news controversy drama latest`, 5);
+  const news = await firecrawlSearch(`${quotedTopic} news controversy drama latest`, 5);
   allResults.push(...news);
   emit(sessionId, {
     type: 'search_done', label: 'News & Drama', count: news.length,
     titles: news.slice(0, 4).map(r => r.title || r.url || 'Untitled'),
   });
+  await wait(1500);
   const newsText = makeNarration('news', topic, news, null);
   emit(sessionId, { type: 'narration', text: newsText, phase: 'news' });
-  // Skip TTS for news — go straight to deep dive
+  const newsAudio = await generateSpeech(newsText);
+  if (newsAudio) {
+    emit(sessionId, { type: 'audio', audio: newsAudio, phase: 'news' });
+    const wordCount = newsText.split(/\s+/).length;
+    const estimatedDuration = Math.max(4000, wordCount * 400);
+    console.log(`  ⏳ Waiting ${estimatedDuration}ms for news narration (${wordCount} words)`);
+    await wait(estimatedDuration);
+  }
 
   // ── Phase 5: Deep Dive ──
   emit(sessionId, { type: 'phase', phase: 'deep_dive', message: 'Deep scanning social media...' });
-  const deep = await firecrawlSearch(`${topic} twitter social media trending sentiment`, 4);
+  const deep = await firecrawlSearch(`${quotedTopic} twitter social media trending sentiment`, 4);
   allResults.push(...deep);
   emit(sessionId, {
-    type: 'search_done', label: 'Social Media', count: deep.length,
+    type: 'search_done', label: 'Social Media Deep Dive', count: deep.length,
     titles: deep.slice(0, 3).map(r => r.title || r.url || 'Untitled'),
   });
+  await wait(1500);
   const deepText = makeNarration('deep_dive', topic, deep, null);
   emit(sessionId, { type: 'narration', text: deepText, phase: 'deep_dive' });
+  const deepAudio = await generateSpeech(deepText);
+  if (deepAudio) {
+    emit(sessionId, { type: 'audio', audio: deepAudio, phase: 'deep_dive' });
+    const wordCount = deepText.split(/\s+/).length;
+    const estimatedDuration = Math.max(3000, wordCount * 400);
+    console.log(`  ⏳ Waiting ${estimatedDuration}ms for deep dive narration (${wordCount} words)`);
+    await wait(estimatedDuration);
+  }
 
   // ── Phase 6: Calculate & Verdict ──
   emit(sessionId, { type: 'phase', phase: 'analyzing', message: 'Calculating Vibe Index...' });
+  await wait(2000); // Dramatic pause
+
   const analysis = calculateVibeScore(allResults);
   const mode = analysis.isRoast ? 'roast' : 'hype';
   const triggers = extractTriggers(allResults, analysis.isRoast);
@@ -388,14 +429,21 @@ async function runVibeCheck(topic, sessionId) {
     triggers,
   });
 
-  // Brief pause for dramatic effect before verdict
-  await new Promise(r => setTimeout(r, 1500));
+  // Dramatic pause before verdict
+  await wait(2500);
 
   const verdictPhase = analysis.isRoast ? 'verdict_roast' : 'verdict_hype';
   const verdictText = makeNarration(verdictPhase, topic, allResults, analysis);
   emit(sessionId, { type: 'narration', text: verdictText, phase: 'verdict' });
   const verdictAudio = await generateSpeech(verdictText);
-  if (verdictAudio) emit(sessionId, { type: 'audio', audio: verdictAudio, phase: 'verdict' });
+  if (verdictAudio) {
+    emit(sessionId, { type: 'audio', audio: verdictAudio, phase: 'verdict' });
+    // Wait for verdict audio to play before sending complete
+    const wordCount = verdictText.split(/\s+/).length;
+    const estimatedDuration = Math.max(5000, wordCount * 400);
+    console.log(`  ⏳ Waiting ${estimatedDuration}ms for verdict narration (${wordCount} words)`);
+    await wait(estimatedDuration);
+  }
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`✅ Complete in ${elapsed}s — ${mode} ${analysis.score}/10`);
