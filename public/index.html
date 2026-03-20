@@ -1,1081 +1,811 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="dark" lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Vibe Check — Is It Fire or Trash?</title>
-  <meta name="description" content="Type any brand, product, or topic. We crawl the internet live and deliver a brutally honest roast or enthusiastic hype verdict." />
-  <meta property="og:title" content="Vibe Check — Is It Fire or Trash?" />
-  <meta property="og:description" content="AI-powered brand verdict generator. Live internet crawling + voice delivery." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <meta name="description" content="AI crawls the internet live and delivers a brutally honest roast or hype verdict on any brand, product, or topic." />
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "background": "#0e0e0e",
+            "surface": "#0e0e0e",
+            "surface-container": "#1a1919",
+            "surface-container-low": "#131313",
+            "surface-container-high": "#201f1f",
+            "surface-container-highest": "#262626",
+            "surface-variant": "#262626",
+            "on-surface": "#ffffff",
+            "on-surface-variant": "#adaaaa",
+            "on-background": "#ffffff",
+            "primary": "#ff8f6f",
+            "primary-dim": "#ff734a",
+            "primary-container": "#ff7851",
+            "primary-fixed-dim": "#ff5d2b",
+            "on-primary": "#5c1400",
+            "on-primary-container": "#470e00",
+            "secondary": "#c180ff",
+            "secondary-dim": "#9c48ea",
+            "secondary-container": "#6f00be",
+            "on-secondary": "#33005b",
+            "on-secondary-container": "#e9cdff",
+            "outline": "#767575",
+            "outline-variant": "#484847",
+            "error": "#ff716c",
+          },
+          fontFamily: {
+            "headline": ["Inter", "sans-serif"],
+            "body": ["Inter", "sans-serif"],
+          },
+        },
+      },
+    };
+  </script>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    :root {
-      --fire: #ff6b35;
-      --fire-glow: rgba(255, 107, 53, 0.4);
-      --hype: #a855f7;
-      --hype-glow: rgba(168, 85, 247, 0.4);
-      --bg: #07070d;
-      --card: rgba(255,255,255,0.03);
-      --card-border: rgba(255,255,255,0.06);
-      --card-hover: rgba(255,255,255,0.05);
-      --text: #f0f0f5;
-      --muted: #6b6b80;
-      --dim: #3a3a4a;
-      --green: #22c55e;
-      --input-bg: rgba(255,255,255,0.04);
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
     }
-
     body {
-      font-family: 'Space Grotesk', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* ── Background ── */
-    .bg-noise {
-      position: fixed; inset: 0; z-index: 0;
-      opacity: 0.03;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    }
-    .bg-gradient {
-      position: fixed; inset: 0; z-index: 0;
-      background:
-        radial-gradient(ellipse 60% 40% at 30% 20%, rgba(255, 107, 53, 0.06) 0%, transparent 60%),
-        radial-gradient(ellipse 50% 35% at 70% 80%, rgba(168, 85, 247, 0.05) 0%, transparent 60%);
-      animation: bgPulse 10s ease-in-out infinite alternate;
-    }
-    @keyframes bgPulse { 0% { opacity: 0.5; } 100% { opacity: 1; } }
-
-    /* ── Layout ── */
-    .app {
-      position: relative; z-index: 1;
-      display: grid;
-      grid-template-columns: 1fr 380px;
-      min-height: 100vh;
-      max-width: 1280px;
-      margin: 0 auto;
-    }
-
-    /* ── Left: Main stage ── */
-    .stage {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 3rem 2rem;
-      gap: 1.5rem;
-    }
-
-    .header { text-align: center; margin-bottom: 0.5rem; }
-
-    .logo {
-      font-size: 4rem;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      line-height: 1;
-    }
-    .logo .fire { color: var(--fire); }
-    .logo .purple { color: var(--hype); }
-
-    .tagline {
-      font-size: 1.1rem;
-      color: var(--muted);
-      margin-top: 0.5rem;
-      font-weight: 400;
-    }
-
-    /* ── Input Area ── */
-    .input-area {
-      width: 100%;
-      max-width: 560px;
-    }
-
-    .input-wrapper {
-      display: flex;
-      gap: 0;
-      background: var(--input-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 16px;
-      overflow: hidden;
-      transition: border-color 0.3s, box-shadow 0.3s;
-    }
-    .input-wrapper:focus-within {
-      border-color: var(--fire);
-      box-shadow: 0 0 30px rgba(255, 107, 53, 0.1);
-    }
-    .input-wrapper.hype-mode:focus-within {
-      border-color: var(--hype);
-      box-shadow: 0 0 30px rgba(168, 85, 247, 0.1);
-    }
-
-    .topic-input {
-      flex: 1;
-      background: transparent;
-      border: none;
-      padding: 1.1rem 1.5rem;
-      font-family: inherit;
-      font-size: 1.1rem;
-      color: var(--text);
-      outline: none;
-    }
-    .topic-input::placeholder { color: var(--dim); }
-
-    .submit-btn {
-      padding: 1.1rem 2rem;
-      border: none;
-      font-family: inherit;
-      font-size: 1rem;
-      font-weight: 700;
-      cursor: pointer;
-      background: var(--fire);
-      color: white;
-      transition: all 0.3s;
-      white-space: nowrap;
-    }
-    .submit-btn:hover { filter: brightness(1.15); }
-    .submit-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    .submit-btn.hype-mode { background: var(--hype); }
-
-    .input-hint {
-      text-align: center;
-      font-size: 0.78rem;
-      color: var(--dim);
-      margin-top: 0.5rem;
-    }
-
-    /* ── Mode toggle ── */
-    .mode-row {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-    .mode-toggle {
-      display: flex;
-      background: var(--card);
-      border: 1px solid var(--card-border);
-      border-radius: 999px;
-      padding: 4px;
-      backdrop-filter: blur(20px);
-    }
-    .mode-btn {
-      padding: 0.5rem 1.5rem;
-      border-radius: 999px;
-      border: none;
-      font-family: inherit;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-      background: transparent;
-      color: var(--muted);
-    }
-    .mode-btn.active-roast {
-      background: var(--fire);
+      background: #0e0e0e;
       color: #fff;
-      box-shadow: 0 0 24px var(--fire-glow);
+      font-family: 'Inter', sans-serif;
     }
-    .mode-btn.active-hype {
-      background: var(--hype);
-      color: #fff;
-      box-shadow: 0 0 24px var(--hype-glow);
+    /* Ambient glow effects */
+    .glow-primary { box-shadow: 0 0 60px -10px rgba(255, 143, 111, 0.35); }
+    .glow-secondary { box-shadow: 0 0 60px -10px rgba(193, 128, 255, 0.35); }
+    .text-glow-primary { text-shadow: 0 0 30px rgba(255, 143, 111, 0.4); }
+    .text-glow-secondary { text-shadow: 0 0 30px rgba(193, 128, 255, 0.4); }
+    .ambient-bloom-primary {
+      background: radial-gradient(circle, rgba(255, 143, 111, 0.12) 0%, transparent 70%);
     }
-
-    /* ── Loading State ── */
-    .loading-state {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      gap: 1rem;
-      width: 100%;
-      max-width: 560px;
+    .ambient-bloom-secondary {
+      background: radial-gradient(circle, rgba(193, 128, 255, 0.12) 0%, transparent 70%);
     }
-    .loading-state.visible { display: flex; }
-
-    .loading-orb {
-      width: 120px;
-      height: 120px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 38% 35%, var(--fire), #c44a20 70%, #7a2e13);
-      box-shadow: 0 0 60px rgba(255, 107, 53, 0.2);
-      animation: orbPulse 1.5s ease-in-out infinite;
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #262626; border-radius: 10px; }
+    /* Smooth section transitions */
+    .screen { display: none; }
+    .screen.active { display: block; animation: fadeUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
     }
-    .loading-orb.hype {
-      background: radial-gradient(circle at 38% 35%, var(--hype), #7e3acd 70%, #4c1d95);
-      box-shadow: 0 0 60px rgba(168, 85, 247, 0.2);
+    @keyframes pulseRing {
+      0%, 100% { transform: scale(1); opacity: 0.3; }
+      50% { transform: scale(1.08); opacity: 0.6; }
     }
-    @keyframes orbPulse {
-      0%, 100% { transform: scale(1); opacity: 0.8; }
-      50% { transform: scale(1.08); opacity: 1; }
+    @keyframes speakerPulse {
+      0%, 100% { box-shadow: 0 0 20px rgba(255, 143, 111, 0.2); }
+      50% { box-shadow: 0 0 40px rgba(255, 143, 111, 0.5); }
     }
-
-    .loading-text {
-      font-size: 1rem;
-      color: var(--muted);
-      font-weight: 500;
-      text-align: center;
+    .speaker-active { animation: speakerPulse 0.8s ease-in-out infinite; }
+    .speaker-active-hype {
+      animation: speakerPulseHype 0.8s ease-in-out infinite;
     }
-    .loading-phase {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.82rem;
-      color: var(--fire);
+    @keyframes speakerPulseHype {
+      0%, 100% { box-shadow: 0 0 20px rgba(193, 128, 255, 0.2); }
+      50% { box-shadow: 0 0 40px rgba(193, 128, 255, 0.5); }
     }
-    .loading-phase.hype { color: var(--hype); }
-
-    /* ── Verdict Card ── */
-    .verdict-card {
-      display: none;
-      width: 100%;
-      max-width: 560px;
-      background: var(--card);
-      border: 1px solid var(--card-border);
-      border-radius: 20px;
-      padding: 2rem;
-      backdrop-filter: blur(20px);
-      animation: cardIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    @keyframes countUp {
+      from { opacity: 0; transform: scale(0.5); }
+      to { opacity: 1; transform: scale(1); }
     }
-    .verdict-card.visible { display: block; }
-    @keyframes cardIn {
-      from { opacity: 0; transform: translateY(20px) scale(0.95); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-
-    .verdict-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 1.5rem;
-    }
-    .verdict-topic {
-      font-size: 1.3rem;
-      font-weight: 700;
-    }
-    .verdict-badge {
-      padding: 0.35rem 1rem;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-    .verdict-badge.roast { background: var(--fire); color: white; }
-    .verdict-badge.hype { background: var(--hype); color: white; }
-
-    /* Score gauge */
-    .score-section {
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-      margin-bottom: 1.5rem;
-    }
-    .score-ring {
-      position: relative;
-      width: 100px;
-      height: 100px;
-      flex-shrink: 0;
-    }
-    .score-ring svg {
-      transform: rotate(-90deg);
-      width: 100px;
-      height: 100px;
-    }
-    .score-ring .bg-ring {
-      fill: none;
-      stroke: var(--card-border);
-      stroke-width: 6;
-    }
-    .score-ring .fg-ring {
-      fill: none;
-      stroke-width: 6;
-      stroke-linecap: round;
-      transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .score-number {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 2rem;
-      font-weight: 800;
-      font-family: 'JetBrains Mono', monospace;
-    }
-    .score-label {
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--dim);
-      text-align: center;
-      margin-top: -0.5rem;
-    }
-    .score-desc {
-      font-size: 0.95rem;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
-    /* Verdict text */
-    .verdict-text {
-      font-size: 0.95rem;
-      line-height: 1.7;
-      color: var(--text);
-      margin-bottom: 1.5rem;
-      padding: 1rem;
-      background: rgba(255,255,255,0.02);
-      border-radius: 12px;
-      border-left: 3px solid var(--fire);
-    }
-    .verdict-text.hype { border-left-color: var(--hype); }
-
-    /* Audio player */
-    .audio-section {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 1.5rem;
-    }
-    .play-btn {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      border: none;
-      background: var(--fire);
-      color: white;
-      font-size: 1.2rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s;
-      flex-shrink: 0;
-    }
-    .play-btn:hover { transform: scale(1.1); filter: brightness(1.15); }
-    .play-btn.hype { background: var(--hype); }
-    .play-btn.playing { animation: speakPulse 0.6s ease-in-out infinite alternate; }
-    @keyframes speakPulse {
-      from { box-shadow: 0 0 10px var(--fire-glow); }
-      to { box-shadow: 0 0 30px var(--fire-glow); }
-    }
-    .audio-label {
-      font-size: 0.82rem;
-      color: var(--muted);
-    }
-    .audio-bar {
-      flex: 1;
-      height: 4px;
-      background: var(--card-border);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .audio-progress {
-      height: 100%;
-      width: 0%;
-      background: var(--fire);
-      border-radius: 2px;
-      transition: width 0.1s linear;
-    }
-    .audio-progress.hype { background: var(--hype); }
-
-    /* Actions */
-    .verdict-actions {
-      display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-    .action-btn {
-      padding: 0.65rem 1.3rem;
-      border-radius: 12px;
-      border: 1px solid var(--card-border);
-      background: var(--card);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .action-btn:hover {
-      background: var(--card-hover);
-      border-color: rgba(255,255,255,0.12);
-    }
-    .action-btn.primary {
-      background: #1DA1F2;
-      border-color: #1DA1F2;
-      color: white;
-    }
-    .action-btn.primary:hover { filter: brightness(1.15); }
-    .action-btn.new-check {
-      border-color: var(--fire);
-      color: var(--fire);
-    }
-
-    /* Sources */
-    .sources-section {
-      margin-top: 1rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--card-border);
-    }
-    .sources-toggle {
-      font-size: 0.75rem;
-      color: var(--dim);
-      cursor: pointer;
-      font-family: inherit;
-      background: none;
-      border: none;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    .sources-toggle:hover { color: var(--muted); }
-    .sources-list {
-      display: none;
-      margin-top: 0.5rem;
-      gap: 0.3rem;
-      flex-direction: column;
-    }
-    .sources-list.visible { display: flex; }
-    .source-link {
-      font-size: 0.72rem;
-      color: var(--muted);
-      text-decoration: none;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      padding-left: 0.5rem;
-      border-left: 2px solid var(--card-border);
-    }
-    .source-link:hover { color: var(--fire); }
-
-    /* ── Right: Activity panel ── */
-    .activity-panel {
-      border-left: 1px solid var(--card-border);
-      background: rgba(255,255,255,0.01);
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      position: sticky;
-      top: 0;
-    }
-
-    .panel-header {
-      padding: 1.5rem 1.25rem 1rem;
-      border-bottom: 1px solid var(--card-border);
-    }
-    .panel-title {
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--dim);
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .panel-title .dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--dim);
-      transition: background 0.3s;
-    }
-    .panel-title .dot.live {
-      background: var(--green);
-      box-shadow: 0 0 8px rgba(34,197,94,0.5);
-      animation: dotPulse 2s infinite;
-    }
-    @keyframes dotPulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
-
-    .activity-feed {
-      flex: 1;
-      overflow-y: auto;
-      padding: 0.75rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      scrollbar-width: thin;
-      scrollbar-color: var(--dim) transparent;
-    }
-
-    .activity-item {
-      background: var(--card);
-      border: 1px solid var(--card-border);
-      border-radius: 10px;
-      padding: 0.75rem 0.9rem;
-      animation: slideIn 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-      font-size: 0.82rem;
-    }
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateX(16px); }
-      to { opacity: 1; transform: translateX(0); }
-    }
-
-    .activity-item .act-header {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      margin-bottom: 0.3rem;
-    }
-    .act-icon { font-size: 0.9rem; }
-    .act-label {
-      font-weight: 600;
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-    .act-label.searching { color: var(--fire); }
-    .act-label.found { color: var(--green); }
-    .act-label.brand { color: var(--hype); }
-    .act-label.error { color: #ef4444; }
-    .act-label.status { color: #60a5fa; }
-
-    .act-query {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.78rem;
-      color: var(--text);
-      opacity: 0.8;
-      word-break: break-word;
-    }
-
-    .act-results {
-      margin-top: 0.35rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.15rem;
-    }
-    .act-result-title {
-      font-size: 0.72rem;
-      color: var(--muted);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      padding-left: 0.5rem;
-      border-left: 2px solid var(--card-border);
-    }
-
-    .act-time {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.65rem;
-      color: var(--dim);
-      margin-top: 0.3rem;
-    }
-
-    .activity-empty {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      flex: 1;
-      color: var(--dim);
-      font-size: 0.82rem;
-      text-align: center;
-      padding: 2rem;
-      gap: 0.75rem;
-    }
-    .activity-empty .empty-icon { font-size: 2rem; opacity: 0.3; }
-
-    /* ── How it works ── */
-    .how-section {
-      padding: 1rem 1.25rem;
-      border-top: 1px solid var(--card-border);
-    }
-    .how-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.5rem;
-      margin-top: 0.5rem;
-    }
-    .how-step {
-      background: var(--card);
-      border: 1px solid var(--card-border);
-      border-radius: 8px;
-      padding: 0.6rem;
-      text-align: center;
-    }
-    .how-step .step-num {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.65rem;
-      color: var(--dim);
-      margin-bottom: 0.2rem;
-    }
-    .how-step .step-icon { font-size: 1.1rem; }
-    .how-step .step-text {
-      font-size: 0.7rem;
-      color: var(--muted);
-      line-height: 1.3;
-      margin-top: 0.2rem;
-    }
-
-    /* ── Footer ── */
-    .footer {
-      padding: 0.75rem 1.25rem;
-      border-top: 1px solid var(--card-border);
-      text-align: center;
-      font-size: 0.65rem;
-      color: var(--dim);
-    }
-    .footer a { color: var(--fire); text-decoration: none; }
-    .footer a:hover { text-decoration: underline; }
-
-    /* ── Spinner ── */
-    .spinner {
-      display: inline-block;
-      width: 12px; height: 12px;
-      border: 2px solid var(--fire);
-      border-top-color: transparent;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ── Responsive ── */
-    @media (max-width: 860px) {
-      .app { grid-template-columns: 1fr; }
-      .activity-panel {
-        border-left: none;
-        border-top: 1px solid var(--card-border);
-        height: auto;
-        max-height: 50vh;
-        position: relative;
-      }
-      .logo { font-size: 3rem; }
-      .stage { padding: 2rem 1rem; }
+    .score-reveal { animation: countUp 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    /* Dot grid pattern */
+    .dot-grid {
+      background-image: radial-gradient(circle, #262626 1px, transparent 1px);
+      background-size: 32px 32px;
     }
   </style>
 </head>
-<body>
-  <div class="bg-noise"></div>
-  <div class="bg-gradient"></div>
+<body class="min-h-screen overflow-x-hidden">
 
-  <div class="app">
-    <!-- LEFT: Main stage -->
-    <div class="stage">
-      <div class="header">
-        <div class="logo">
-          <span class="fire">VIBE</span> <span class="purple">CHECK</span>
-        </div>
-        <p class="tagline">Type anything. We crawl the internet. You get the truth.</p>
-      </div>
-
-      <div class="mode-row">
-        <div class="mode-toggle">
-          <button class="mode-btn active-roast" id="btn-roast" onclick="setMode('roast')">🔥 Roast</button>
-          <button class="mode-btn" id="btn-hype" onclick="setMode('hype')">🚀 Hype</button>
-        </div>
-      </div>
-
-      <div class="input-area" id="input-area">
-        <div class="input-wrapper" id="input-wrapper">
-          <input
-            type="text"
-            class="topic-input"
-            id="topic-input"
-            placeholder="Enter a brand, product, site, or topic..."
-            autocomplete="off"
-            autofocus
-          />
-          <button class="submit-btn" id="submit-btn" onclick="startVibeCheck()">
-            VIBE CHECK
-          </button>
-        </div>
-        <p class="input-hint">Try: Tesla, TikTok, Crumbl Cookies, Reddit, your startup...</p>
-      </div>
-
-      <!-- Loading state -->
-      <div class="loading-state" id="loading-state">
-        <div class="loading-orb" id="loading-orb"></div>
-        <div class="loading-text" id="loading-text">Crawling the internet...</div>
-        <div class="loading-phase" id="loading-phase">Starting search...</div>
-      </div>
-
-      <!-- Verdict card -->
-      <div class="verdict-card" id="verdict-card">
-        <div class="verdict-header">
-          <span class="verdict-topic" id="verdict-topic"></span>
-          <span class="verdict-badge" id="verdict-badge"></span>
-        </div>
-
-        <div class="score-section">
-          <div class="score-ring">
-            <svg viewBox="0 0 100 100">
-              <circle class="bg-ring" cx="50" cy="50" r="42" />
-              <circle class="fg-ring" id="score-fg" cx="50" cy="50" r="42"
-                stroke-dasharray="264" stroke-dashoffset="264" />
-            </svg>
-            <div class="score-number" id="score-number">0</div>
-          </div>
-          <div>
-            <div class="score-label">VIBE SCORE</div>
-            <p class="score-desc" id="score-desc"></p>
-          </div>
-        </div>
-
-        <div class="verdict-text" id="verdict-text"></div>
-
-        <div class="audio-section" id="audio-section">
-          <button class="play-btn" id="play-btn" onclick="toggleAudio()">▶</button>
-          <div style="flex:1">
-            <div class="audio-label">Listen to the verdict</div>
-            <div class="audio-bar">
-              <div class="audio-progress" id="audio-progress"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="verdict-actions">
-          <button class="action-btn primary" id="share-x-btn" onclick="shareOnX()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-            Share on X
-          </button>
-          <button class="action-btn new-check" onclick="resetForNewCheck()">
-            ↻ New Vibe Check
-          </button>
-        </div>
-
-        <div class="sources-section">
-          <button class="sources-toggle" onclick="toggleSources()">▸ Sources (<span id="source-count">0</span>)</button>
-          <div class="sources-list" id="sources-list"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- RIGHT: Activity panel -->
-    <div class="activity-panel">
-      <div class="panel-header">
-        <div class="panel-title">
-          <span class="dot" id="sse-dot"></span>
-          Live Crawl Activity
-        </div>
-      </div>
-
-      <div class="activity-feed" id="activity-feed">
-        <div class="activity-empty" id="activity-empty">
-          <div class="empty-icon">🔍</div>
-          <div>Waiting for a search...<br/>Type a topic to see live results</div>
-        </div>
-      </div>
-
-      <div class="how-section">
-        <div class="section-label" style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--dim);font-weight:600;">How It Works</div>
-        <div class="how-grid">
-          <div class="how-step">
-            <div class="step-num">01</div>
-            <div class="step-icon">⌨️</div>
-            <div class="step-text">Type any topic</div>
-          </div>
-          <div class="how-step">
-            <div class="step-num">02</div>
-            <div class="step-icon">🔍</div>
-            <div class="step-text">Firecrawl searches live</div>
-          </div>
-          <div class="how-step">
-            <div class="step-num">03</div>
-            <div class="step-icon">🧠</div>
-            <div class="step-text">AI crafts a verdict</div>
-          </div>
-          <div class="how-step">
-            <div class="step-num">04</div>
-            <div class="step-icon">📢</div>
-            <div class="step-text">Hear & share the score</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="footer">
-        Built for <a href="https://hacks.elevenlabs.io/">ElevenHacks #0</a> ·
-        <a href="https://github.com/Socialure/vibe-check">GitHub</a><br/>
-        <a href="https://elevenlabs.io">ElevenLabs</a> + <a href="https://firecrawl.dev">Firecrawl</a>
-      </div>
-    </div>
+<!-- ═══════════════ TOP NAV ═══════════════ -->
+<header class="sticky top-0 z-50 bg-surface-container flex justify-between items-center px-6 py-4">
+  <div class="font-black tracking-tighter uppercase text-2xl text-primary">VIBE CHECK</div>
+  <div class="flex items-center gap-6">
+    <a href="https://github.com/Socialure/vibe-check" target="_blank" class="text-on-surface-variant hover:text-primary transition-colors text-xs font-bold tracking-widest uppercase">GitHub</a>
+    <span class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors cursor-pointer" onclick="resetToLanding()">home</span>
   </div>
+</header>
 
-  <script>
-    let currentMode = 'roast';
-    let audioElement = null;
-    let currentResult = null;
-    let sessionId = null;
-    let eventSource = null;
+<!-- ═══════════════ SCREEN 1: LANDING ═══════════════ -->
+<div id="screen-landing" class="screen active">
+  <main class="relative min-h-[90vh] flex flex-col items-center justify-center text-center px-6">
+    <!-- Ambient background -->
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/15 rounded-full blur-[120px] -z-10"></div>
 
-    // ── Mode toggle ──
-    window.setMode = function(mode) {
-      currentMode = mode;
-      const roastBtn = document.getElementById('btn-roast');
-      const hypeBtn = document.getElementById('btn-hype');
-      const wrapper = document.getElementById('input-wrapper');
-      const submitBtn = document.getElementById('submit-btn');
+    <!-- Central Motif -->
+    <div class="relative mb-12">
+      <div class="w-56 h-56 md:w-80 md:h-80 rounded-full border-[10px] border-primary-container/20 flex items-center justify-center glow-primary bg-surface-container-low/40 backdrop-blur-xl relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-tr from-primary/10 to-transparent"></div>
+        <span class="material-symbols-outlined text-7xl md:text-9xl text-primary animate-pulse" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+      </div>
+    </div>
 
-      roastBtn.className = mode === 'roast' ? 'mode-btn active-roast' : 'mode-btn';
-      hypeBtn.className = mode === 'hype' ? 'mode-btn active-hype' : 'mode-btn';
+    <!-- Title -->
+    <h1 class="text-5xl md:text-8xl font-black tracking-tighter uppercase mb-4 leading-none">
+      <span class="text-primary">VIBE</span> <span class="text-secondary">CHECK</span>
+    </h1>
+    <p class="max-w-xl text-on-surface-variant text-lg md:text-xl font-medium leading-relaxed mb-12">
+      The radical editorial lens for your digital presence. Precise, Swiss-inspired, and brutally honest.
+    </p>
 
-      if (mode === 'hype') {
-        wrapper.classList.add('hype-mode');
-        submitBtn.classList.add('hype-mode');
-      } else {
-        wrapper.classList.remove('hype-mode');
-        submitBtn.classList.remove('hype-mode');
-      }
+    <!-- Search Bar -->
+    <div class="w-full max-w-2xl">
+      <div class="relative flex items-center bg-surface-container-highest rounded-full px-6 py-4 border border-outline-variant/10 focus-within:border-primary/50 transition-all">
+        <span class="material-symbols-outlined text-on-surface-variant mr-4">search</span>
+        <input
+          id="topic-input"
+          type="text"
+          class="bg-transparent border-none focus:ring-0 focus:outline-none text-on-surface w-full font-bold tracking-widest placeholder:text-outline text-sm uppercase"
+          placeholder="DROP A BRAND, PRODUCT, OR TOPIC..."
+          autocomplete="off"
+          autofocus
+        />
+        <button id="submit-btn" onclick="startVibeCheck()" class="ml-4 bg-primary-container text-on-primary-container px-6 py-2 rounded-full font-black tracking-tight uppercase text-sm hover:scale-105 active:scale-95 transition-transform whitespace-nowrap">
+          CHECK
+        </button>
+      </div>
+      <p class="mt-4 text-[10px] font-bold tracking-[0.15em] text-on-surface-variant/60 uppercase">
+        Try: Tesla, TikTok, Crumbl Cookies, Reddit, ChatGPT, your startup...
+      </p>
+    </div>
+  </main>
+
+  <!-- Bento How It Works -->
+  <section class="px-6 py-16 max-w-6xl mx-auto">
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-5">
+      <div class="md:col-span-8 bg-surface-container rounded-xl p-8 flex flex-col justify-between min-h-[280px] relative overflow-hidden group">
+        <div class="absolute top-0 right-0 p-6">
+          <span class="material-symbols-outlined text-primary/15 text-[120px] leading-none select-none">analytics</span>
+        </div>
+        <div>
+          <span class="inline-block px-3 py-1 bg-primary/10 text-primary text-[10px] font-black tracking-widest uppercase rounded-full mb-4">Step 01</span>
+          <h3 class="text-3xl font-black tracking-tighter uppercase mb-3">LIVE INTERNET CRAWL</h3>
+          <p class="text-on-surface-variant max-w-sm leading-relaxed text-sm">We search reviews, Reddit, forums, news, and social media in real-time using Firecrawl. Every data point is analyzed.</p>
+        </div>
+      </div>
+      <div class="md:col-span-4 bg-surface-container-high rounded-xl p-8 flex flex-col justify-center text-center relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-b from-secondary/5 to-transparent"></div>
+        <span class="material-symbols-outlined text-secondary text-4xl mb-4">auto_awesome</span>
+        <h3 class="text-xl font-black tracking-tighter uppercase mb-3">AI VERDICT</h3>
+        <p class="text-on-surface-variant text-xs leading-relaxed">Our formula analyzes sentiment, controversy, and enthusiasm to decide: ROAST or HYPE.</p>
+      </div>
+      <div class="md:col-span-4 bg-surface-container-low rounded-xl p-6 border border-outline-variant/5">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-2 h-2 rounded-full bg-error animate-pulse"></div>
+          <span class="text-[10px] font-black tracking-widest text-on-surface-variant uppercase">VOICE NARRATION</span>
+        </div>
+        <p class="text-on-surface-variant text-xs leading-relaxed">Our AI voice agent narrates the analysis live as it happens, using ElevenLabs TTS. Hear the verdict in real-time.</p>
+      </div>
+      <div class="md:col-span-8 bg-surface-container rounded-xl p-8 flex items-center gap-6">
+        <div class="w-14 h-14 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+          <span class="material-symbols-outlined text-primary text-2xl" style="font-variation-settings: 'FILL' 1;">share</span>
+        </div>
+        <div>
+          <h3 class="text-xl font-black tracking-tighter uppercase mb-1">SHARE YOUR SCORE</h3>
+          <p class="text-on-surface-variant text-xs leading-relaxed">Get your Vibe Score and share it on X. Let the world know if your brand is fire or trash.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="py-8 text-center">
+    <div class="flex justify-center gap-8 mb-3">
+      <a href="https://hacks.elevenlabs.io/" target="_blank" class="text-[10px] font-medium tracking-widest uppercase text-on-surface-variant hover:text-primary transition-colors">ElevenHacks</a>
+      <a href="https://firecrawl.dev" target="_blank" class="text-[10px] font-medium tracking-widest uppercase text-on-surface-variant hover:text-primary transition-colors">Firecrawl</a>
+      <a href="https://elevenlabs.io" target="_blank" class="text-[10px] font-medium tracking-widest uppercase text-on-surface-variant hover:text-primary transition-colors">ElevenLabs</a>
+    </div>
+    <p class="text-[10px] font-medium tracking-widest uppercase text-on-surface-variant/50">Built by Socialure for ElevenHacks #0</p>
+  </footer>
+</div>
+
+<!-- ═══════════════ SCREEN 2: LIVE CRAWL ═══════════════ -->
+<div id="screen-crawl" class="screen">
+  <main class="min-h-[90vh] flex flex-col items-center pt-8 pb-24 px-6 max-w-7xl mx-auto w-full">
+
+    <!-- Status Header -->
+    <section class="w-full grid grid-cols-1 md:grid-cols-12 gap-6 mb-12 items-end">
+      <div class="md:col-span-8">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="relative flex h-3 w-3">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+          </span>
+          <span class="text-[10px] font-bold tracking-[0.2em] text-primary uppercase">LIVE CRAWL ACTIVE</span>
+        </div>
+        <h1 class="text-4xl md:text-6xl font-black tracking-tighter uppercase leading-[0.9]">
+          SEARCHING LIVE INTERNET<br/>
+          <span class="text-secondary">FOR LATEST BUZZ</span>
+        </h1>
+      </div>
+      <div class="md:col-span-4 flex flex-col items-start md:items-end">
+        <p id="crawl-status-text" class="text-on-surface-variant text-sm font-medium leading-relaxed max-w-xs md:text-right">
+          Our neural agents are dissecting social sentiment, market trends, and underground forums to calculate the Vibe Index.
+        </p>
+      </div>
+    </section>
+
+    <!-- Central Pulse -->
+    <section class="relative w-full aspect-video flex items-center justify-center mb-12 overflow-hidden rounded-xl bg-surface-container-low">
+      <div class="absolute inset-0 opacity-10 pointer-events-none dot-grid"></div>
+      <!-- Speaker indicator -->
+      <div id="speaker-indicator" class="relative z-10 w-48 h-48 md:w-64 md:h-64 rounded-full flex items-center justify-center border-2 border-primary/20 bg-surface-container-high glow-primary transition-all duration-500">
+        <div class="absolute inset-0 rounded-full bg-primary/5 animate-pulse"></div>
+        <div class="flex flex-col items-center text-center">
+          <span class="material-symbols-outlined text-primary text-5xl mb-2" style="font-variation-settings: 'FILL' 1;" id="pulse-icon">sensors</span>
+          <div id="synergy-pct" class="text-primary font-black text-xl tracking-tighter">0%</div>
+          <div class="text-on-surface-variant text-[10px] font-bold tracking-widest uppercase mt-1">SYNERGY</div>
+        </div>
+      </div>
+      <!-- Floating nodes -->
+      <div id="node-left" class="absolute top-1/4 left-[15%] p-3 bg-surface-container-highest rounded-lg border-l-4 border-secondary glow-secondary hidden md:block opacity-0 transition-opacity duration-700">
+        <div class="text-[8px] font-bold text-secondary uppercase mb-1">Incoming Data</div>
+        <div id="node-left-text" class="text-[10px] text-on-surface truncate max-w-[140px]">Waiting...</div>
+      </div>
+      <div id="node-right" class="absolute bottom-1/3 right-[10%] p-3 bg-surface-container-highest rounded-lg border-r-4 border-primary glow-primary hidden md:block opacity-0 transition-opacity duration-700">
+        <div class="text-[8px] font-bold text-primary uppercase mb-1">Sentiment</div>
+        <div id="node-right-text" class="text-[10px] text-on-surface">Analyzing...</div>
+      </div>
+    </section>
+
+    <!-- Bento: Transcript + Metrics -->
+    <div class="w-full grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <!-- Live Transcript -->
+      <div class="lg:col-span-2 bg-surface-container-low rounded-xl p-5 relative overflow-hidden">
+        <div class="flex justify-between items-center mb-4">
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] font-bold tracking-[0.1em] text-on-surface-variant uppercase">LIVE TRANSCRIPT</span>
+            <div class="h-[1px] w-6 bg-outline-variant"></div>
+          </div>
+          <span class="material-symbols-outlined text-primary text-sm">terminal</span>
+        </div>
+        <div id="transcript-feed" class="space-y-2 font-mono text-[11px] leading-tight overflow-y-auto max-h-[300px] pr-3">
+          <div class="flex gap-3 opacity-50">
+            <span class="text-outline shrink-0" id="ts-init">[--:--:--]</span>
+            <span class="text-on-surface">Initializing Vibe Check engine...</span>
+          </div>
+        </div>
+        <div class="absolute bottom-0 left-0 w-full h-10 bg-gradient-to-t from-surface-container-low to-transparent pointer-events-none"></div>
+      </div>
+
+      <!-- Side Metrics -->
+      <div class="space-y-5">
+        <div class="bg-surface-container p-5 rounded-xl">
+          <div class="flex justify-between items-start mb-3">
+            <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Global Heat</div>
+            <span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+          </div>
+          <div id="heat-value" class="text-3xl font-black text-on-surface tracking-tighter">--<span class="text-lg font-bold text-on-surface-variant">%</span></div>
+          <div class="mt-3 h-1 w-full bg-surface-container-low rounded-full overflow-hidden">
+            <div id="heat-bar" class="h-full bg-primary rounded-full transition-all duration-1000" style="width:0%"></div>
+          </div>
+        </div>
+        <div class="bg-surface-container p-5 rounded-xl">
+          <div class="flex justify-between items-start mb-3">
+            <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">AI Confidence</div>
+            <span class="material-symbols-outlined text-secondary">auto_awesome</span>
+          </div>
+          <div id="confidence-value" class="text-3xl font-black text-on-surface tracking-tighter">LOW</div>
+          <p id="confidence-text" class="text-[10px] text-on-surface-variant mt-1">Gathering initial data...</p>
+        </div>
+        <div class="bg-surface-container p-5 rounded-xl">
+          <div class="flex justify-between items-start mb-3">
+            <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Sources Found</div>
+            <span class="material-symbols-outlined text-on-surface-variant">database</span>
+          </div>
+          <div id="sources-count" class="text-3xl font-black text-on-surface tracking-tighter">0</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ═══════════════ SCREEN 3: VERDICT ═══════════════ -->
+<div id="screen-verdict" class="screen">
+  <main class="min-h-[90vh] flex flex-col items-center pt-8 pb-32 overflow-x-hidden">
+
+    <!-- Ambient glow (set by JS) -->
+    <div id="verdict-ambient" class="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full -z-10 pointer-events-none"></div>
+
+    <!-- Big Bold Header -->
+    <section id="verdict-hero" class="w-full max-w-7xl px-6 flex flex-col items-center md:items-start text-center md:text-left mb-12">
+      <div class="inline-flex items-center gap-4 mb-4">
+        <span class="h-[2px] w-12" id="verdict-line"></span>
+        <span class="font-label text-sm uppercase tracking-[0.2em] text-on-surface-variant">Vibe Analysis Complete</span>
+      </div>
+      <h1 id="verdict-title" class="font-black text-7xl md:text-[10rem] leading-[0.85] tracking-tighter uppercase"></h1>
+      <div id="verdict-subtitle" class="mt-3 flex flex-wrap gap-3 font-black text-3xl md:text-5xl text-on-surface uppercase opacity-20"></div>
+    </section>
+
+    <!-- Central Motif -->
+    <section class="relative w-full flex justify-center items-center py-12 px-6">
+      <div class="relative w-56 h-56 md:w-80 md:h-80">
+        <div id="verdict-ring-1" class="absolute inset-0 rounded-full border scale-125" style="animation: pulseRing 3s ease-in-out infinite;"></div>
+        <div id="verdict-ring-2" class="absolute inset-0 rounded-full border scale-150 opacity-30"></div>
+        <div id="verdict-circle" class="absolute inset-0 rounded-full flex items-center justify-center overflow-hidden">
+          <div class="flex flex-col items-center text-center z-10">
+            <div id="verdict-score-big" class="font-black text-6xl md:text-8xl tracking-tighter score-reveal"></div>
+            <div class="text-[10px] font-bold tracking-widest uppercase mt-1 opacity-70">VIBE SCORE</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Audio Player Bar -->
+    <section id="audio-bar" class="w-full max-w-3xl px-6 mb-12 hidden">
+      <div class="bg-surface-container rounded-full px-5 py-3 flex items-center gap-4">
+        <button id="verdict-play-btn" onclick="toggleVerdictAudio()" class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all">
+          <span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+        </button>
+        <div class="flex-1">
+          <div class="h-1 w-full bg-surface-container-low rounded-full overflow-hidden">
+            <div id="verdict-audio-progress" class="h-full rounded-full transition-all duration-100" style="width:0%"></div>
+          </div>
+        </div>
+        <span id="audio-status-text" class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant">Listen</span>
+      </div>
+    </section>
+
+    <!-- Monologue + Stats -->
+    <section class="w-full max-w-5xl px-6 grid grid-cols-1 md:grid-cols-12 gap-6 mt-4">
+      <!-- Main Monologue -->
+      <div class="md:col-span-8 bg-surface-container rounded-xl p-8 md:p-10 relative overflow-hidden">
+        <div class="absolute top-0 right-0 p-4">
+          <span class="material-symbols-outlined text-on-surface/10 text-5xl">format_quote</span>
+        </div>
+        <h3 id="verdict-headline" class="font-bold text-xl mb-4 uppercase tracking-tight italic"></h3>
+        <p id="verdict-monologue" class="text-lg md:text-xl leading-relaxed text-on-surface"></p>
+        <div class="mt-6 pt-6 border-t border-outline-variant/15 flex items-center justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-widest text-on-surface-variant font-label" id="severity-label">Severity</p>
+            <p id="severity-value" class="font-black text-lg uppercase"></p>
+          </div>
+          <div id="live-badge" class="px-4 py-2 rounded-full flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full animate-ping"></span>
+            <span class="font-label text-xs font-bold uppercase" id="live-badge-text">Live</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Side Stats -->
+      <div class="md:col-span-4 space-y-6">
+        <div class="bg-surface-container-low p-6 rounded-xl flex flex-col justify-center">
+          <p class="text-[10px] uppercase tracking-[0.3em] text-on-surface-variant mb-3" id="deficiency-label">Hype Index</p>
+          <span id="deficiency-value" class="font-black text-5xl"></span>
+          <p class="mt-2 text-xs text-on-surface-variant" id="deficiency-desc">Relative to baseline</p>
+        </div>
+        <div id="triggers-card" class="bg-surface-container-highest p-6 rounded-xl">
+          <p class="text-[10px] uppercase tracking-[0.3em] text-on-surface-variant mb-3" id="triggers-label">Key Signals</p>
+          <ul id="triggers-list" class="space-y-2"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Actions -->
+    <section class="mt-12 px-6 flex flex-col items-center gap-4">
+      <button id="share-btn" onclick="shareOnX()" class="font-black text-lg px-10 py-4 rounded-full hover:scale-105 active:scale-95 transition-all uppercase tracking-tight flex items-center gap-3">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        Share on X
+      </button>
+      <button onclick="resetToLanding()" class="text-[10px] font-bold tracking-[0.2em] text-on-surface-variant uppercase cursor-pointer hover:text-on-surface transition-colors">
+        ↻ New Vibe Check
+      </button>
+    </section>
+
+    <!-- Sources -->
+    <section class="w-full max-w-5xl px-6 mt-10">
+      <button onclick="toggleSources()" class="text-[10px] font-bold tracking-[0.15em] text-on-surface-variant uppercase cursor-pointer hover:text-on-surface transition-colors mb-2">
+        ▸ Sources (<span id="verdict-source-count">0</span>)
+      </button>
+      <div id="verdict-sources" class="hidden flex-col gap-1 mt-2">
+      </div>
+    </section>
+
+    <footer class="mt-16 py-8 text-center w-full">
+      <div class="flex justify-center gap-8 mb-3">
+        <a href="https://hacks.elevenlabs.io/" target="_blank" class="text-[10px] font-medium tracking-widest uppercase text-on-surface-variant hover:text-primary transition-colors">ElevenHacks</a>
+        <a href="https://github.com/Socialure/vibe-check" target="_blank" class="text-[10px] font-medium tracking-widest uppercase text-on-surface-variant hover:text-primary transition-colors">GitHub</a>
+      </div>
+      <p class="text-[10px] font-medium tracking-widest uppercase text-on-surface-variant/50">Built by Socialure for ElevenHacks #0</p>
+    </footer>
+  </main>
+</div>
+
+<!-- ═══════════════ JAVASCRIPT ═══════════════ -->
+<script>
+  let sessionId = null;
+  let eventSource = null;
+  let audioQueue = [];
+  let isPlaying = false;
+  let currentAudio = null;
+  let verdictData = null;
+  let totalSourcesFound = 0;
+  let crawlStartTime = null;
+
+  // ── Screen Management ──
+  function showScreen(name) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(`screen-${name}`).classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function resetToLanding() {
+    if (eventSource) { eventSource.close(); eventSource = null; }
+    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+    audioQueue = [];
+    isPlaying = false;
+    totalSourcesFound = 0;
+    verdictData = null;
+    showScreen('landing');
+    document.getElementById('topic-input').value = '';
+    document.getElementById('topic-input').focus();
+  }
+
+  // ── Enter Key ──
+  document.getElementById('topic-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); startVibeCheck(); }
+  });
+
+  // ── Start Vibe Check ──
+  async function startVibeCheck() {
+    const input = document.getElementById('topic-input');
+    const topic = input.value.trim();
+    if (!topic) return;
+
+    sessionId = crypto.randomUUID();
+    crawlStartTime = Date.now();
+    totalSourcesFound = 0;
+    audioQueue = [];
+    isPlaying = false;
+
+    // Reset crawl screen
+    document.getElementById('transcript-feed').innerHTML = '';
+    document.getElementById('heat-value').textContent = '--';
+    document.getElementById('heat-bar').style.width = '0%';
+    document.getElementById('confidence-value').textContent = 'LOW';
+    document.getElementById('confidence-text').textContent = 'Gathering initial data...';
+    document.getElementById('sources-count').textContent = '0';
+    document.getElementById('synergy-pct').textContent = '0%';
+    document.getElementById('node-left').style.opacity = '0';
+    document.getElementById('node-right').style.opacity = '0';
+
+    showScreen('crawl');
+
+    // Connect SSE first
+    connectSSE(sessionId);
+
+    // Fire POST to start processing
+    try {
+      await fetch('/api/vibe-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic, sessionId }),
+      });
+    } catch (err) {
+      addTranscriptLine('ERROR', err.message, 'text-error');
+    }
+  }
+
+  // ── SSE Connection ──
+  function connectSSE(sid) {
+    if (eventSource) eventSource.close();
+    eventSource = new EventSource(`/api/stream/${sid}`);
+
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      handleSSE(data);
     };
 
-    // ── Enter key handler ──
-    document.getElementById('topic-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        startVibeCheck();
+    eventSource.onerror = () => {
+      // Connection closed by server after complete
+    };
+  }
+
+  // ── Handle SSE Events ──
+  function handleSSE(data) {
+    switch (data.type) {
+      case 'connected':
+        addTranscriptLine('SYS', 'Connected to Vibe Check engine', 'text-on-surface-variant');
+        break;
+
+      case 'phase':
+        addTranscriptLine('INFO', data.message, 'text-primary');
+        updateSynergy(data.phase);
+        break;
+
+      case 'search_done':
+        totalSourcesFound += data.count;
+        document.getElementById('sources-count').textContent = totalSourcesFound;
+        addTranscriptLine(data.label.includes('Reddit') ? 'FORUM' : data.label.includes('News') ? 'NEWS' : 'CRAWL',
+          `${data.label}: ${data.count} results found`, 'text-secondary');
+        if (data.titles) {
+          data.titles.forEach(t => addTranscriptLine('', `  → ${t}`, 'text-on-surface-variant opacity-70'));
+        }
+        // Update nodes
+        document.getElementById('node-left').style.opacity = '1';
+        document.getElementById('node-left-text').textContent = data.label;
+        // Update heat estimate
+        const heatEst = Math.min(95, Math.round((totalSourcesFound / 25) * 100));
+        document.getElementById('heat-value').textContent = heatEst;
+        document.getElementById('heat-bar').style.width = heatEst + '%';
+        break;
+
+      case 'narration':
+        addTranscriptLine('AGENT', data.text, 'text-on-surface');
+        break;
+
+      case 'audio':
+        audioQueue.push(data.audio);
+        if (!isPlaying) playNextAudio();
+        break;
+
+      case 'score_reveal':
+        addTranscriptLine('SCORE', `Vibe Score: ${data.score}/10 — ${data.mode.toUpperCase()}`, data.isRoast ? 'text-primary' : 'text-secondary');
+        document.getElementById('confidence-value').textContent = 'HIGH';
+        document.getElementById('confidence-text').textContent = `Score calculated: ${data.score}/10`;
+        document.getElementById('node-right').style.opacity = '1';
+        document.getElementById('node-right-text').textContent = `${data.mode.toUpperCase()} ${data.score}/10`;
+        break;
+
+      case 'complete':
+        verdictData = data;
+        // Wait for audio queue to finish, then show verdict
+        if (audioQueue.length === 0 && !isPlaying) {
+          showVerdictScreen(data);
+        }
+        // Otherwise, showVerdictScreen is called when audio finishes
+        break;
+
+      case 'error':
+        addTranscriptLine('ERROR', data.message, 'text-error');
+        break;
+    }
+  }
+
+  // ── Synergy % animation ──
+  function updateSynergy(phase) {
+    const phases = { opening: 10, reviews: 30, opinions: 55, news: 75, deep_dive: 88, analyzing: 95 };
+    const pct = phases[phase] || 0;
+    document.getElementById('synergy-pct').textContent = pct + '%';
+
+    // Update confidence
+    if (pct > 50) {
+      document.getElementById('confidence-value').textContent = 'MEDIUM';
+      document.getElementById('confidence-text').textContent = 'Building pattern confidence...';
+    }
+    if (pct > 80) {
+      document.getElementById('confidence-value').textContent = 'HIGH';
+      document.getElementById('confidence-text').textContent = 'Neural patterns converging...';
+    }
+  }
+
+  // ── Add line to transcript ──
+  function addTranscriptLine(label, text, colorClass) {
+    const feed = document.getElementById('transcript-feed');
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const div = document.createElement('div');
+    div.className = 'flex gap-3';
+    div.innerHTML = `
+      <span class="text-outline shrink-0">[${now}]</span>
+      <span class="text-on-surface">
+        ${label ? `<span class="${colorClass} font-bold">${label}:</span> ` : ''}${text}
+      </span>
+    `;
+    feed.appendChild(div);
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  // ── Audio Queue Playback ──
+  function playNextAudio() {
+    if (audioQueue.length === 0) {
+      isPlaying = false;
+      document.getElementById('speaker-indicator').classList.remove('speaker-active');
+      // If verdict data is ready, show verdict screen
+      if (verdictData) {
+        setTimeout(() => showVerdictScreen(verdictData), 800);
       }
+      return;
+    }
+
+    isPlaying = true;
+    const base64 = audioQueue.shift();
+    currentAudio = new Audio(`data:audio/mpeg;base64,${base64}`);
+
+    // Visual feedback
+    document.getElementById('speaker-indicator').classList.add('speaker-active');
+    document.getElementById('pulse-icon').textContent = 'graphic_eq';
+
+    currentAudio.addEventListener('ended', () => {
+      document.getElementById('pulse-icon').textContent = 'sensors';
+      playNextAudio();
     });
 
-    // ── Start Vibe Check ──
-    window.startVibeCheck = async function() {
-      const input = document.getElementById('topic-input');
-      const topic = input.value.trim();
-      if (!topic) return;
+    currentAudio.addEventListener('error', () => {
+      playNextAudio();
+    });
 
-      const submitBtn = document.getElementById('submit-btn');
-      submitBtn.disabled = true;
+    currentAudio.play().catch(() => playNextAudio());
+  }
 
-      // Generate session ID
-      sessionId = crypto.randomUUID();
+  // ── Show Verdict Screen ──
+  function showVerdictScreen(data) {
+    const isRoast = data.mode === 'roast';
 
-      // Switch to loading state
-      document.getElementById('input-area').style.display = 'none';
-      document.getElementById('verdict-card').classList.remove('visible');
-      const loading = document.getElementById('loading-state');
-      loading.classList.add('visible');
+    // Colors
+    const mainColor = isRoast ? '#ff8f6f' : '#c180ff';
+    const accentClass = isRoast ? 'text-primary' : 'text-secondary';
+    const bgClass = isRoast ? 'bg-primary' : 'bg-secondary';
 
-      const loadingOrb = document.getElementById('loading-orb');
-      const loadingPhase = document.getElementById('loading-phase');
-      loadingOrb.className = currentMode === 'hype' ? 'loading-orb hype' : 'loading-orb';
-      loadingPhase.className = currentMode === 'hype' ? 'loading-phase hype' : 'loading-phase';
+    // Ambient
+    document.getElementById('verdict-ambient').className =
+      `absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full -z-10 pointer-events-none ${isRoast ? 'ambient-bloom-primary' : 'ambient-bloom-secondary'}`;
 
-      // Clear activity feed
-      const feed = document.getElementById('activity-feed');
-      const empty = document.getElementById('activity-empty');
-      feed.innerHTML = '';
-      if (empty) feed.appendChild(empty);
-      if (empty) empty.style.display = 'none';
+    // Title
+    document.getElementById('verdict-line').className = `h-[2px] w-12 ${bgClass}`;
+    const title = document.getElementById('verdict-title');
+    title.textContent = isRoast ? 'ROAST' : 'HYPE';
+    title.className = `font-black text-7xl md:text-[10rem] leading-[0.85] tracking-tighter uppercase ${accentClass} ${isRoast ? 'text-glow-primary' : 'text-glow-secondary'}`;
 
-      // Connect SSE
-      connectSSE(sessionId);
+    // Subtitle
+    const subtitles = isRoast
+      ? ['IDENTITY', 'REVOKED', 'SYSTEMS', 'OVERHEAT']
+      : ['ULTRA', 'REVEAL', 'MAXIMUM', 'ENERGY'];
+    const subtitleHtml = subtitles.map((w, i) =>
+      i === 1 ? `<span class="${accentClass} opacity-100">${w}</span>` : `<span>${w}</span>`
+    ).join('');
+    document.getElementById('verdict-subtitle').innerHTML = subtitleHtml;
 
-      try {
-        const res = await fetch('/api/vibe-check', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic, mode: currentMode, sessionId }),
-        });
+    // Score circle
+    const circle = document.getElementById('verdict-circle');
+    circle.className = `absolute inset-0 rounded-full flex items-center justify-center overflow-hidden ${isRoast ? 'bg-gradient-to-tr from-primary-fixed-dim via-primary to-secondary' : 'bg-gradient-to-br from-secondary to-secondary-container'}`;
+    circle.style.boxShadow = `0 0 80px ${isRoast ? 'rgba(255,93,43,0.4)' : 'rgba(193,128,255,0.4)'}`;
 
-        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    document.getElementById('verdict-ring-1').className = `absolute inset-0 rounded-full border ${isRoast ? 'border-primary/20' : 'border-secondary/20'} scale-125`;
+    document.getElementById('verdict-ring-2').className = `absolute inset-0 rounded-full border ${isRoast ? 'border-primary/10' : 'border-secondary/10'} scale-150 opacity-30`;
 
-        const data = await res.json();
-        currentResult = data;
-        showVerdict(data);
-      } catch (err) {
-        console.error('Vibe Check failed:', err);
-        document.getElementById('loading-text').textContent = 'Something went wrong!';
-        loadingPhase.textContent = err.message;
-        setTimeout(() => resetForNewCheck(), 3000);
-      } finally {
-        submitBtn.disabled = false;
-        if (eventSource) { eventSource.close(); eventSource = null; }
-      }
-    };
+    const scoreBig = document.getElementById('verdict-score-big');
+    scoreBig.textContent = data.score + '/10';
+    scoreBig.className = `font-black text-6xl md:text-8xl tracking-tighter score-reveal ${isRoast ? 'text-on-primary-container' : 'text-on-secondary'}`;
 
-    // ── Connect SSE for live activity ──
-    function connectSSE(sid) {
-      if (eventSource) eventSource.close();
-      eventSource = new EventSource(`/api/activity/${sid}`);
-      const dot = document.getElementById('sse-dot');
-
-      eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.type === 'connected') { dot.classList.add('live'); return; }
-
-        const emptyEl = document.getElementById('activity-empty');
-        if (emptyEl) emptyEl.style.display = 'none';
-
-        // Update loading phase text
-        if (data.type === 'status') {
-          document.getElementById('loading-text').textContent = data.message;
-          document.getElementById('loading-phase').textContent = data.phase === 'crawl' ? 'Firecrawl searching...' : data.phase === 'analyze' ? 'Crunching sentiment...' : data.phase === 'speech' ? 'ElevenLabs generating voice...' : '✓';
-        }
-
-        const feed = document.getElementById('activity-feed');
-        const item = document.createElement('div');
-        item.className = 'activity-item';
-        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-        if (data.type === 'crawl_start') {
-          item.innerHTML = `<div class="act-header"><span class="act-icon">🎯</span><span class="act-label brand">Vibe Checking</span></div><div class="act-query">"${data.topic}"</div><div class="act-time">${now}</div>`;
-        } else if (data.type === 'search_start') {
-          item.innerHTML = `<div class="act-header"><span class="act-icon"><span class="spinner"></span></span><span class="act-label searching">${data.label || 'Searching'}</span></div><div class="act-query">${data.query}</div><div class="act-time">${now}</div>`;
-        } else if (data.type === 'search_done') {
-          item.innerHTML = `<div class="act-header"><span class="act-icon">✅</span><span class="act-label found">${data.label || 'Found'} — ${data.count} results</span></div><div class="act-query">${data.query}</div>${data.titles?.length ? `<div class="act-results">${data.titles.map(t => `<div class="act-result-title">• ${t}</div>`).join('')}</div>` : ''}<div class="act-time">${now}</div>`;
-        } else if (data.type === 'search_error') {
-          item.innerHTML = `<div class="act-header"><span class="act-icon">❌</span><span class="act-label error">Error</span></div><div class="act-query">${data.query}: ${data.error}</div><div class="act-time">${now}</div>`;
-        } else if (data.type === 'crawl_done') {
-          item.innerHTML = `<div class="act-header"><span class="act-icon">🏁</span><span class="act-label found">Crawl Complete — ${data.totalResults} results</span></div><div class="act-time">${now}</div>`;
-        } else if (data.type === 'status') {
-          item.innerHTML = `<div class="act-header"><span class="act-icon">⚡</span><span class="act-label status">${data.message}</span></div><div class="act-time">${now}</div>`;
-        } else return;
-
-        feed.appendChild(item);
-        feed.scrollTop = feed.scrollHeight;
-      };
-
-      eventSource.onerror = () => { dot.classList.remove('live'); };
+    // Audio bar
+    const audioBar = document.getElementById('audio-bar');
+    if (verdictAudioB64) {
+      audioBar.classList.remove('hidden');
+      const playBtn = document.getElementById('verdict-play-btn');
+      playBtn.className = `w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${isRoast ? 'bg-primary text-on-primary' : 'bg-secondary text-on-secondary'}`;
+      document.getElementById('verdict-audio-progress').className = `h-full rounded-full transition-all duration-100 ${isRoast ? 'bg-primary' : 'bg-secondary'}`;
     }
 
-    // ── Show Verdict ──
-    function showVerdict(data) {
-      const loading = document.getElementById('loading-state');
-      loading.classList.remove('visible');
+    // Monologue
+    const headlines = isRoast
+      ? [`"The Aesthetic Equivalent of a Lukewarm Latte."`, `"Houston, We Have a Problem."`, `"Certified Not It."`, `"Internet Said No."`, `"Vibes? What Vibes?"`]
+      : [`"This Is What Momentum Looks Like."`, `"The Internet Has Spoken: Fire."`, `"Certified Fresh."`, `"Main Character Energy."`, `"The Hype Is Real."`];
+    document.getElementById('verdict-headline').textContent = headlines[Math.floor(Math.random() * headlines.length)];
+    document.getElementById('verdict-headline').className = `font-bold text-xl mb-4 uppercase tracking-tight italic ${isRoast ? 'text-primary-fixed-dim' : 'text-secondary'}`;
+    document.getElementById('verdict-monologue').textContent = data.verdict;
 
-      const card = document.getElementById('verdict-card');
-      card.classList.add('visible');
+    // Severity
+    const severities = isRoast
+      ? { 1: 'CATASTROPHIC', 2: 'CRITICAL', 3: 'SEVERE', 4: 'MODERATE', 5: 'MILD' }
+      : { 6: 'PROMISING', 7: 'STRONG', 8: 'ELITE', 9: 'LEGENDARY', 10: 'MYTHIC' };
+    document.getElementById('severity-label').textContent = isRoast ? 'Roast Severity' : 'Hype Level';
+    document.getElementById('severity-value').textContent = severities[data.score] || (isRoast ? 'MODERATE' : 'STRONG');
+    document.getElementById('severity-value').className = `font-black text-lg uppercase ${accentClass}`;
 
-      // Header
-      document.getElementById('verdict-topic').textContent = data.topic;
-      const badge = document.getElementById('verdict-badge');
-      badge.textContent = data.mode === 'roast' ? '🔥 ROAST' : '🚀 HYPE';
-      badge.className = `verdict-badge ${data.mode}`;
+    // Live badge
+    const badge = document.getElementById('live-badge');
+    badge.className = `px-4 py-2 rounded-full flex items-center gap-2 ${isRoast ? 'bg-primary/10' : 'bg-secondary/10'}`;
+    badge.querySelector('span:first-child').className = `w-2 h-2 rounded-full animate-ping ${bgClass}`;
+    document.getElementById('live-badge-text').className = `font-label text-xs font-bold uppercase ${accentClass}`;
+    document.getElementById('live-badge-text').textContent = isRoast ? 'Live Burn' : 'Live Hype';
 
-      // Score ring
-      const circumference = 2 * Math.PI * 42; // ~264
-      const offset = circumference - (data.score / 10) * circumference;
-      const fg = document.getElementById('score-fg');
-      fg.style.stroke = data.mode === 'roast' ? 'var(--fire)' : 'var(--hype)';
-      setTimeout(() => { fg.style.strokeDashoffset = offset; }, 100);
+    // Deficiency stat
+    document.getElementById('deficiency-label').textContent = isRoast ? 'Hype Deficiency' : 'Hype Surplus';
+    document.getElementById('deficiency-value').textContent = (data.hypeDeficiency > 0 ? '+' : '') + data.hypeDeficiency + '%';
+    document.getElementById('deficiency-value').className = `font-black text-5xl ${accentClass}`;
+    document.getElementById('deficiency-desc').textContent = isRoast ? 'Relative to industry standard "Edge"' : 'Above baseline expectations';
 
-      const scoreNum = document.getElementById('score-number');
-      scoreNum.style.color = data.mode === 'roast' ? 'var(--fire)' : 'var(--hype)';
-      animateNumber(scoreNum, data.score);
+    // Triggers
+    const triggersList = document.getElementById('triggers-list');
+    document.getElementById('triggers-label').textContent = isRoast ? 'Top Cringe Triggers' : 'Key Strengths';
+    document.getElementById('triggers-card').className = `bg-surface-container-highest p-6 rounded-xl ${isRoast ? 'border-l-4 border-primary' : 'border-l-4 border-secondary'}`;
+    triggersList.innerHTML = (data.triggers || []).map(t => `
+      <li class="flex items-center gap-3">
+        <span class="material-symbols-outlined ${accentClass} text-sm">${isRoast ? 'close' : 'check'}</span>
+        <span class="text-sm font-bold uppercase tracking-wider">${t}</span>
+      </li>
+    `).join('');
 
-      // Score description
-      const descs = {
-        roast: { 1: 'Absolute dumpster fire', 2: 'Yikes on bikes', 3: 'Not great, Bob', 4: 'Below average vibes', 5: 'Aggressively mid', 6: 'Could be worse...', 7: 'Surprisingly decent', 8: 'Respect earned', 9: 'Hard to roast', 10: 'Immune to criticism' },
-        hype: { 1: 'Needs CPR', 2: 'Struggling but trying', 3: 'Some potential there', 4: 'Building momentum', 5: 'Solid foundation', 6: 'Getting interesting', 7: 'Real heat here', 8: 'On fire', 9: 'Absolutely elite', 10: 'LEGENDARY status' }
-      };
-      document.getElementById('score-desc').textContent = descs[data.mode][data.score] || 'Vibes assessed';
+    // Share button
+    const shareBtn = document.getElementById('share-btn');
+    shareBtn.className = `font-black text-lg px-10 py-4 rounded-full hover:scale-105 active:scale-95 transition-all uppercase tracking-tight flex items-center gap-3 ${isRoast ? 'bg-primary-container text-on-primary-container' : 'bg-secondary-container text-on-secondary-container'}`;
+    shareBtn.style.boxShadow = `0 20px 40px ${isRoast ? 'rgba(255,143,111,0.3)' : 'rgba(193,128,255,0.3)'}`;
 
-      // Verdict text
-      const vt = document.getElementById('verdict-text');
-      vt.textContent = data.verdict;
-      vt.className = `verdict-text ${data.mode === 'hype' ? 'hype' : ''}`;
-
-      // Audio
-      if (data.audio) {
-        document.getElementById('audio-section').style.display = 'flex';
-        const playBtn = document.getElementById('play-btn');
-        playBtn.className = `play-btn ${data.mode === 'hype' ? 'hype' : ''}`;
-        const prog = document.getElementById('audio-progress');
-        prog.className = `audio-progress ${data.mode === 'hype' ? 'hype' : ''}`;
-
-        audioElement = new Audio(`data:audio/mpeg;base64,${data.audio}`);
-        audioElement.addEventListener('timeupdate', () => {
-          if (audioElement.duration) {
-            prog.style.width = `${(audioElement.currentTime / audioElement.duration) * 100}%`;
-          }
-        });
-        audioElement.addEventListener('ended', () => {
-          playBtn.textContent = '▶';
-          playBtn.classList.remove('playing');
-        });
-
-        // Auto-play
-        audioElement.play().then(() => {
-          playBtn.textContent = '⏸';
-          playBtn.classList.add('playing');
-        }).catch(() => {});
-      } else {
-        document.getElementById('audio-section').style.display = 'none';
-      }
-
-      // Sources
-      if (data.sources?.length) {
-        document.getElementById('source-count').textContent = data.sources.length;
-        const list = document.getElementById('sources-list');
-        list.innerHTML = data.sources.map(s =>
-          `<a class="source-link" href="${s.url}" target="_blank" rel="noopener">${s.title || s.url}</a>`
-        ).join('');
-      }
+    // Sources
+    if (data.sources?.length) {
+      document.getElementById('verdict-source-count').textContent = data.sources.length;
+      document.getElementById('verdict-sources').innerHTML = data.sources.map(s =>
+        `<a href="${s.url}" target="_blank" rel="noopener" class="text-[11px] text-on-surface-variant hover:text-primary transition-colors truncate block pl-3 border-l-2 border-outline-variant/30">${s.title || s.url}</a>`
+      ).join('');
     }
 
-    function animateNumber(el, target) {
-      let current = 0;
-      const step = () => {
-        current++;
-        el.textContent = current;
-        if (current < target) requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
+    showScreen('verdict');
+  }
+
+  // ── Verdict audio storage ──
+  let verdictAudioB64 = null;
+
+  // Override handleSSE audio for verdict phase
+  const _origHandleSSE = handleSSE;
+  handleSSE = function(data) {
+    if (data.type === 'audio' && data.phase === 'verdict') {
+      verdictAudioB64 = data.audio;
+    }
+    _origHandleSSE(data);
+  };
+
+  // ── Toggle verdict audio ──
+  function toggleVerdictAudio() {
+    if (!verdictAudioB64) return;
+    const btn = document.getElementById('verdict-play-btn');
+    const progress = document.getElementById('verdict-audio-progress');
+    const statusText = document.getElementById('audio-status-text');
+
+    if (currentAudio && !currentAudio.paused) {
+      currentAudio.pause();
+      btn.querySelector('.material-symbols-outlined').textContent = 'play_arrow';
+      statusText.textContent = 'Paused';
+      return;
     }
 
-    // ── Toggle Audio ──
-    window.toggleAudio = function() {
-      if (!audioElement) return;
-      const btn = document.getElementById('play-btn');
-      if (audioElement.paused) {
-        audioElement.play();
-        btn.textContent = '⏸';
-        btn.classList.add('playing');
-      } else {
-        audioElement.pause();
-        btn.textContent = '▶';
-        btn.classList.remove('playing');
+    currentAudio = new Audio(`data:audio/mpeg;base64,${verdictAudioB64}`);
+    btn.querySelector('.material-symbols-outlined').textContent = 'pause';
+    statusText.textContent = 'Playing';
+
+    currentAudio.addEventListener('timeupdate', () => {
+      if (currentAudio.duration) {
+        progress.style.width = `${(currentAudio.currentTime / currentAudio.duration) * 100}%`;
       }
-    };
+    });
+    currentAudio.addEventListener('ended', () => {
+      btn.querySelector('.material-symbols-outlined').textContent = 'play_arrow';
+      statusText.textContent = 'Listen again';
+      progress.style.width = '0%';
+    });
+    currentAudio.play().catch(() => {});
+  }
+  window.toggleVerdictAudio = toggleVerdictAudio;
 
-    // ── Share on X ──
-    window.shareOnX = function() {
-      if (!currentResult) return;
-      const { topic, score, mode } = currentResult;
-      const emoji = mode === 'roast' ? '🔥' : '🚀';
-      const label = mode === 'roast' ? 'Roast' : 'Hype';
-      const text = `${emoji} ${topic} got a ${score}/10 ${label} Score on Vibe Check!\n\nAI crawled the internet and delivered the verdict.\n\nCheck your brand's vibe 👇`;
-      const url = window.location.origin;
-      const shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
-      window.open(shareUrl, '_blank', 'width=600,height=400');
-    };
+  // ── Share on X ──
+  function shareOnX() {
+    if (!verdictData) return;
+    const { topic, score, mode } = verdictData;
+    const emoji = mode === 'roast' ? '🔥' : '✨';
+    const label = mode === 'roast' ? 'Roast' : 'Hype';
+    const text = `${emoji} ${topic} got a ${score}/10 ${label} Score on Vibe Check!\n\nAI crawled the entire internet and delivered the verdict.\n\nGet your brand checked 👇`;
+    const url = window.location.origin;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'width=600,height=400');
+  }
+  window.shareOnX = shareOnX;
 
-    // ── Toggle Sources ──
-    window.toggleSources = function() {
-      const list = document.getElementById('sources-list');
-      const toggle = document.querySelector('.sources-toggle');
-      if (list.classList.contains('visible')) {
-        list.classList.remove('visible');
-        toggle.textContent = `▸ Sources (${document.getElementById('source-count').textContent})`;
-      } else {
-        list.classList.add('visible');
-        toggle.textContent = `▾ Sources (${document.getElementById('source-count').textContent})`;
-      }
-    };
-
-    // ── Reset ──
-    window.resetForNewCheck = function() {
-      document.getElementById('loading-state').classList.remove('visible');
-      document.getElementById('verdict-card').classList.remove('visible');
-      document.getElementById('input-area').style.display = 'block';
-      document.getElementById('topic-input').value = '';
-      document.getElementById('topic-input').focus();
-
-      // Reset score ring
-      document.getElementById('score-fg').style.strokeDashoffset = '264';
-      document.getElementById('score-number').textContent = '0';
-      document.getElementById('audio-progress').style.width = '0%';
-
-      if (audioElement) { audioElement.pause(); audioElement = null; }
-      currentResult = null;
-    };
-  </script>
+  // ── Toggle Sources ──
+  function toggleSources() {
+    const el = document.getElementById('verdict-sources');
+    el.classList.toggle('hidden');
+    el.classList.toggle('flex');
+  }
+  window.toggleSources = toggleSources;
+  window.resetToLanding = resetToLanding;
+</script>
 </body>
 </html>
