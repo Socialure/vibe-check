@@ -17,12 +17,17 @@ const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 
 // Load agent config for signed URL generation
-let AGENT_ID;
-try {
-  const agentConfig = JSON.parse(readFileSync(join(__dirname, 'agent-config.json'), 'utf-8'));
-  AGENT_ID = agentConfig.agent_id;
-} catch (e) {
-  console.warn('⚠️ agent-config.json not found — signed URL endpoint disabled');
+// Priority: env var > agent-config.json > hardcoded fallback
+let AGENT_ID = process.env.ELEVENLABS_AGENT_ID;
+if (!AGENT_ID) {
+  try {
+    const agentConfig = JSON.parse(readFileSync(join(__dirname, 'agent-config.json'), 'utf-8'));
+    AGENT_ID = agentConfig.agent_id;
+  } catch (e) {
+    // Hardcoded fallback — agent ID is not a secret (it's in the public widget)
+    AGENT_ID = 'agent_9901km4fzxnqehd9yftccq7wnjbq';
+    console.log('ℹ️ Using hardcoded agent ID (agent-config.json not found)');
+  }
 }
 
 // ── Active session tracking (single-user demo) ─────────────────────
@@ -409,6 +414,9 @@ app.get('/api/signed-url', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ── Favicon (prevent 404) ────────────────────────────────────────────
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 // ── Health ───────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
