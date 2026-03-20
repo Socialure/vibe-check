@@ -24,10 +24,10 @@ async function createTool() {
     method: 'POST',
     headers,
     body: JSON.stringify({
-      name: 'vibe_check_search',
-      description: 'Search the internet for the latest buzz, reviews, opinions, and news about a brand or product. Call this whenever the user mentions a brand, product, or company they want a vibe check on.',
       tool_config: {
         type: 'webhook',
+        name: 'vibe_check_search',
+        description: 'Search the internet for the latest buzz, reviews, opinions, and news about a brand or product. Call this whenever the user mentions a brand, product, or company they want a vibe check on.',
         api_schema: {
           url: `${SERVER_URL}/api/vibe-check`,
           method: 'POST',
@@ -122,7 +122,7 @@ Channel your inner MrBeast meets a Silicon Valley evangelist. Be:
           }
         },
         tts: {
-          model_id: 'eleven_flash_v2_5',
+          model_id: 'eleven_turbo_v2',
           voice_id: 'cjVigY5qzO86Huf0OWal', // Eric — energetic male voice
           stability: 0.4,
           similarity_boost: 0.8,

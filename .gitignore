@@ -1,3 +1,4 @@
 node_modules/
 .env
 .DS_Store
+agent-config.json
