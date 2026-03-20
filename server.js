@@ -88,10 +88,22 @@ app.post('/api/vibe-check', async (req, res) => {
     console.log(`🔍 Searching for: "${brand}" in ${mode} mode...`);
     const context = await buildBrandContext(brand);
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`✅ Search complete in ${elapsed}s`);
+    console.log(`✅ Search complete in ${elapsed}s — ${context.length} chars`);
 
     // Return context for the LLM to synthesize into a monologue
-    const response = `Here is fresh internet research about "${brand}". Use this to deliver a ${mode === 'hype' ? 'enthusiastic hype' : 'brutally funny roast'} monologue (30-60 seconds when spoken). Be specific — reference actual facts from the search results:\n\n${context}`;
+    const modeInstruction = mode === 'hype'
+      ? 'an enthusiastic, over-the-top HYPE monologue. Find the absolute best in this brand. Be infectious, use superlatives, reference real positive facts.'
+      : 'a brutally funny ROAST monologue. Be savage but hilarious — like Simon Cowell crossed with a Reddit thread. Reference real problems and controversies.';
+
+    const response = `Here is fresh internet research about "${brand}". Deliver ${modeInstruction}
+
+RULES:
+- Keep it 30-60 seconds when spoken (about 100-180 words)
+- Reference SPECIFIC facts from the search results below
+- End with a vibe verdict rating out of 10
+- Be entertaining above all else
+
+${context}`;
 
     res.json({ response });
   } catch (err) {
@@ -99,6 +111,19 @@ app.post('/api/vibe-check', async (req, res) => {
     res.json({
       response: `I tried to search for information but hit a snag. Just wing it with a ${req.body.mode || 'roast'} about "${req.body.brand || 'this brand'}" based on what you already know. Be entertaining!`
     });
+  }
+});
+
+// ── Test endpoint (for manual testing without ElevenLabs) ─────────────
+app.get('/api/test-search', async (req, res) => {
+  const brand = req.query.brand || 'Apple';
+  const mode = req.query.mode || 'roast';
+  console.log(`🧪 Test search: "${brand}" (${mode})`);
+  try {
+    const context = await buildBrandContext(brand);
+    res.json({ brand, mode, results_length: context.length, context });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

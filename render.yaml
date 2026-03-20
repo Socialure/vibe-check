@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: vibe-check
+    name: vibe-check-ai
     runtime: node
     plan: free
     buildCommand: npm install
@@ -13,4 +13,4 @@ services:
       - key: PORT
         value: 3000
       - key: SERVER_URL
-        sync: false
+        value: https://vibe-check-ai.onrender.com
