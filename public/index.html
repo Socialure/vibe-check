@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vibe Check — Is It Fire or Trash?</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --fire: #ff6b35;
+      --trash: #8b5cf6;
+      --bg: #0a0a0f;
+      --card: #12121a;
+      --text: #e4e4e7;
+      --muted: #71717a;
+    }
+
+    body {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animated gradient background */
+    .bg-gradient {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 40%, rgba(255, 107, 53, 0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 60%, rgba(139, 92, 246, 0.08) 0%, transparent 60%);
+      animation: pulseGradient 8s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulseGradient {
+      0% { opacity: 0.6; }
+      100% { opacity: 1; }
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* Header */
+    .logo {
+      font-size: 3.5rem;
+      font-weight: 700;
+      text-align: center;
+      margin-top: 3rem;
+      line-height: 1.1;
+    }
+
+    .logo .fire { color: var(--fire); }
+    .logo .trash { color: var(--trash); }
+
+    .tagline {
+      font-size: 1.25rem;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 0.75rem;
+      margin-bottom: 2rem;
+    }
+
+    /* Mode toggle */
+    .mode-toggle {
+      display: flex;
+      gap: 0.5rem;
+      background: var(--card);
+      border: 1px solid #27272a;
+      border-radius: 999px;
+      padding: 0.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .mode-btn {
+      padding: 0.6rem 1.5rem;
+      border-radius: 999px;
+      border: none;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .mode-btn.active-roast {
+      background: linear-gradient(135deg, var(--fire), #e55a2b);
+      color: white;
+      box-shadow: 0 0 20px rgba(255, 107, 53, 0.3);
+    }
+
+    .mode-btn.active-hype {
+      background: linear-gradient(135deg, var(--trash), #7c3aed);
+      color: white;
+      box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+    }
+
+    /* Orb area */
+    .orb-container {
+      position: relative;
+      width: 220px;
+      height: 220px;
+      margin: 2rem 0;
+    }
+
+    .orb {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, var(--fire), var(--trash));
+      opacity: 0.8;
+      animation: orbPulse 3s ease-in-out infinite;
+      cursor: pointer;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .orb:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 60px rgba(255, 107, 53, 0.4);
+    }
+
+    .orb.speaking {
+      animation: orbSpeak 0.5s ease-in-out infinite alternate;
+    }
+
+    .orb.listening {
+      animation: orbListen 1s ease-in-out infinite;
+    }
+
+    @keyframes orbPulse {
+      0%, 100% { transform: scale(1); opacity: 0.8; }
+      50% { transform: scale(1.03); opacity: 1; }
+    }
+
+    @keyframes orbSpeak {
+      0% { transform: scale(1); box-shadow: 0 0 40px rgba(255, 107, 53, 0.3); }
+      100% { transform: scale(1.08); box-shadow: 0 0 80px rgba(139, 92, 246, 0.5); }
+    }
+
+    @keyframes orbListen {
+      0%, 100% { box-shadow: 0 0 20px rgba(255, 107, 53, 0.2); }
+      50% { box-shadow: 0 0 50px rgba(255, 107, 53, 0.6); }
+    }
+
+    .orb-label {
+      position: absolute;
+      bottom: -1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.85rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    /* Status */
+    .status {
+      font-size: 1rem;
+      color: var(--muted);
+      margin: 2rem 0 1rem;
+      min-height: 1.5rem;
+    }
+
+    .status.active { color: var(--fire); }
+
+    /* Transcript */
+    .transcript-box {
+      width: 100%;
+      background: var(--card);
+      border: 1px solid #27272a;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      min-height: 120px;
+      max-height: 300px;
+      overflow-y: auto;
+      margin-bottom: 2rem;
+    }
+
+    .transcript-box h3 {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .transcript-line {
+      margin-bottom: 0.5rem;
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+
+    .transcript-line .speaker {
+      font-weight: 600;
+    }
+
+    .transcript-line .speaker.user { color: var(--fire); }
+    .transcript-line .speaker.agent { color: var(--trash); }
+
+    .empty-state {
+      color: var(--muted);
+      font-style: italic;
+      font-size: 0.9rem;
+    }
+
+    /* How it works */
+    .how-it-works {
+      width: 100%;
+      margin-top: auto;
+      padding-top: 2rem;
+      border-top: 1px solid #1a1a24;
+    }
+
+    .how-it-works h3 {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+
+    .step {
+      background: var(--card);
+      border: 1px solid #27272a;
+      border-radius: 0.75rem;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .step-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .step-text { font-size: 0.8rem; color: var(--muted); line-height: 1.4; }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      margin-top: 2rem;
+      padding: 1rem;
+      color: var(--muted);
+      font-size: 0.75rem;
+    }
+
+    .footer a {
+      color: var(--fire);
+      text-decoration: none;
+    }
+
+    /* Widget positioning override */
+    elevenlabs-convai {
+      position: fixed !important;
+      bottom: 1.5rem !important;
+      right: 1.5rem !important;
+      z-index: 1000 !important;
+    }
+
+    @media (max-width: 600px) {
+      .logo { font-size: 2.5rem; }
+      .orb-container { width: 160px; height: 160px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-gradient"></div>
+
+  <div class="container">
+    <div class="logo">
+      <span class="fire">VIBE</span> <span class="trash">CHECK</span>
+    </div>
+    <p class="tagline">Say a brand. Get the truth. 🔥 or 🗑️</p>
+
+    <div class="mode-toggle">
+      <button class="mode-btn active-roast" id="btn-roast" onclick="setMode('roast')">🔥 Roast</button>
+      <button class="mode-btn" id="btn-hype" onclick="setMode('hype')">🚀 Hype</button>
+    </div>
+
+    <div class="orb-container">
+      <div class="orb" id="orb" title="Click the mic button below to start"></div>
+      <div class="orb-label" id="orb-label">Click the mic to start</div>
+    </div>
+
+    <div class="status" id="status"></div>
+
+    <div class="transcript-box" id="transcript-box">
+      <h3>Live Transcript</h3>
+      <div id="transcript">
+        <p class="empty-state">Say a brand name to get started...</p>
+      </div>
+    </div>
+
+    <div class="how-it-works">
+      <h3>How It Works</h3>
+      <div class="steps">
+        <div class="step">
+          <div class="step-icon">🎤</div>
+          <div class="step-text">Say any brand or product name</div>
+        </div>
+        <div class="step">
+          <div class="step-icon">🔍</div>
+          <div class="step-text">AI searches live internet for latest buzz</div>
+        </div>
+        <div class="step">
+          <div class="step-icon">🧠</div>
+          <div class="step-text">LLM synthesizes a roast or hype monologue</div>
+        </div>
+        <div class="step">
+          <div class="step-icon">🔊</div>
+          <div class="step-text">Hear the verdict in a wild voice</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      Built for <a href="https://hacks.elevenlabs.io/">ElevenHacks #0</a> ·
+      <a href="https://github.com/Socialure/vibe-check">GitHub</a> ·
+      Powered by <a href="https://elevenlabs.io">ElevenLabs</a> + <a href="https://firecrawl.dev">Firecrawl</a>
+    </div>
+  </div>
+
+  <!-- ElevenLabs widget — AGENT_ID will be replaced after setup -->
+  <elevenlabs-convai agent-id="AGENT_ID_HERE"></elevenlabs-convai>
+  <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
+
+  <script>
+    let currentMode = 'roast';
+
+    function setMode(mode) {
+      currentMode = mode;
+      const roastBtn = document.getElementById('btn-roast');
+      const hypeBtn = document.getElementById('btn-hype');
+
+      roastBtn.className = mode === 'roast' ? 'mode-btn active-roast' : 'mode-btn';
+      hypeBtn.className = mode === 'hype' ? 'mode-btn active-hype' : 'mode-btn';
+
+      // Update orb gradient
+      const orb = document.getElementById('orb');
+      orb.style.background = mode === 'roast'
+        ? 'radial-gradient(circle at 35% 35%, #ff6b35, #e55a2b)'
+        : 'radial-gradient(circle at 35% 35%, #8b5cf6, #7c3aed)';
+    }
+
+    // Listen for widget events to update UI
+    document.addEventListener('DOMContentLoaded', () => {
+      const widget = document.querySelector('elevenlabs-convai');
+      if (widget) {
+        widget.addEventListener('elevenlabs-convai:call', (event) => {
+          const orb = document.getElementById('orb');
+          const label = document.getElementById('orb-label');
+          const status = document.getElementById('status');
+          const transcript = document.getElementById('transcript');
+
+          // Clear empty state on first call
+          if (transcript.querySelector('.empty-state')) {
+            transcript.innerHTML = '';
+          }
+
+          status.textContent = '🎤 Connected — speak a brand name!';
+          status.className = 'status active';
+          orb.classList.add('listening');
+          label.textContent = 'Listening...';
+        });
+
+        widget.addEventListener('elevenlabs-convai:call-end', () => {
+          const orb = document.getElementById('orb');
+          const label = document.getElementById('orb-label');
+          const status = document.getElementById('status');
+
+          orb.classList.remove('speaking', 'listening');
+          label.textContent = 'Click the mic to start';
+          status.textContent = 'Call ended';
+          status.className = 'status';
+        });
+      }
+    });
+  </script>
+</body>
+</html>
