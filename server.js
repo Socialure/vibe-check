@@ -14,6 +14,8 @@ app.use(express.json());
 app.use(express.static(join(__dirname, 'public')));
 
 const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
+const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
+const SEARCH_PROVIDER = process.env.SEARCH_PROVIDER || 'firecrawl';
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 let SERVER_URL = process.env.SERVER_URL; // e.g. https://vibe-check-ai.onrender.com
 
@@ -128,6 +130,64 @@ async function firecrawlSearch(query, limit = 3) {
     console.error('  ❌ Firecrawl error:', e.message);
     return [];
   }
+}
+
+// ── Tavily Search ───────────────────────────────────────────────────
+async function tavilySearch(query, limit = 3) {
+  if (!TAVILY_API_KEY) {
+    console.error('  ❌ TAVILY_API_KEY not set! Cannot search.');
+    return [];
+  }
+  try {
+    console.log(`  🔍 Tavily query: "${query}"`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000); // 12s timeout
+
+    const res = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${TAVILY_API_KEY}`,
+      },
+      body: JSON.stringify({
+        query,
+        max_results: limit,
+        search_depth: 'basic',
+        include_raw_content: false,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      console.error(`  ❌ Tavily ${res.status}: ${errText.substring(0, 200)}`);
+      return [];
+    }
+    const data = await res.json();
+    const results = (data.results || []).map(r => ({
+      title: r.title || '',
+      url: r.url || '',
+      description: r.content || '',
+      markdown: r.raw_content || r.content || '',
+    }));
+    console.log(`  ✅ Tavily returned ${results.length} results`);
+    if (results.length > 0) {
+      console.log(`     First result: "${(results[0].title || 'untitled').substring(0, 60)}"`);
+    }
+    return results;
+  } catch (e) {
+    console.error('  ❌ Tavily error:', e.message);
+    return [];
+  }
+}
+
+// ── Search dispatcher ───────────────────────────────────────────────
+async function search(query, limit = 3) {
+  if (SEARCH_PROVIDER === 'tavily') {
+    return tavilySearch(query, limit);
+  }
+  return firecrawlSearch(query, limit);
 }
 
 // ── Quick sentiment analysis ────────────────────────────────────────
@@ -272,7 +332,7 @@ async function runSearchPhase(brand, phase, sessionId) {
 
   emit(sessionId, { type: 'phase', phase, message: `Searching ${config.label} for "${brand}"...` });
 
-  const results = await firecrawlSearch(config.query, config.limit);
+  const results = await search(config.query, config.limit);
   if (activeSession) {
     activeSession.results.push(...results);
     activeSession.phasesDone.push(phase);
@@ -600,11 +660,13 @@ async function updateAgentWebhookUrl() {
 // ── Debug: test Firecrawl directly ──────────────────────────────────
 app.get('/api/test-crawl', async (req, res) => {
   const query = req.query.q || 'Nike reviews 2025';
-  console.log(`🧪 Test crawl: "${query}"`);
-  const results = await firecrawlSearch(query, 2);
+  console.log(`🧪 Test crawl: "${query}" (provider: ${SEARCH_PROVIDER})`);
+  const results = await search(query, 2);
   res.json({
     query,
+    searchProvider: SEARCH_PROVIDER,
     firecrawlKeySet: !!FIRECRAWL_API_KEY,
+    tavilyKeySet: !!TAVILY_API_KEY,
     resultCount: results.length,
     results: results.map(r => ({ title: r.title, url: r.url })),
   });
@@ -618,7 +680,9 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     service: 'vibe-check-v3-agent',
+    searchProvider: SEARCH_PROVIDER,
     firecrawl: !!FIRECRAWL_API_KEY,
+    tavily: !!TAVILY_API_KEY,
     elevenlabs: !!ELEVENLABS_API_KEY,
     serverUrl: SERVER_URL || 'not set',
     activeSession: activeSession ? { topic: activeSession.topic, phases: activeSession.phasesDone } : null,
@@ -628,7 +692,9 @@ app.get('/api/health', (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`\n🎙️  Vibe Check V3 (Agent Mode) on port ${PORT}`);
+  console.log(`   Search provider: ${SEARCH_PROVIDER}`);
   console.log(`   Firecrawl: ${FIRECRAWL_API_KEY ? '✅' : '❌'}`);
+  console.log(`   Tavily: ${TAVILY_API_KEY ? '✅' : '❌'}`);
   console.log(`   ElevenLabs: ${ELEVENLABS_API_KEY ? '✅' : '❌'}`);
   console.log(`   Server URL: ${SERVER_URL || 'not set'}`);
   console.log(`   Agent webhook: /api/agent-search\n`);
